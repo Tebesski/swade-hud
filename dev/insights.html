@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>SWADE HUD · Roll insights</title>
+<link rel="stylesheet" href="/css/foundry2.css"><link rel="stylesheet" href="/fonts/fontawesome/css/all.min.css">
+<link rel="stylesheet" href="/systems/swade/styles/swade.css"><link rel="stylesheet" href="/modules/swade-hud/styles/swade-hud.css">
+<style>
+html,body{width:100%;height:100%;margin:0}body{background:#363a31}#board{position:absolute;inset:0;width:100%;height:100%}
+#controls{position:fixed;left:12px;top:12px;width:240px;padding:10px;background:#161616e8;z-index:110;font-size:13px;pointer-events:all}
+#controls label{display:flex;align-items:center;gap:6px;margin:5px 0}#controls button{width:100%;margin:4px 0}#checks-result{white-space:pre-wrap;max-height:160px;overflow:auto;font-size:11px}
+.application.feature-dialog{position:fixed!important;width:370px;top:40px;left:280px;max-height:640px}.application.feature-dialog:nth-of-type(2){left:670px}
+.feature-dialog .window-content{overflow:auto}.feature-dialog fieldset{margin:0 0 5px;padding:6px}.feature-dialog .new-modifier-label{min-width:0}
+.feature-dialog .formula textarea{min-height:40px;height:40px}.feature-dialog .form-footer{display:flex;gap:4px}.feature-dialog .form-footer button{flex:1}
+#chat-sample{position:fixed;right:15px;top:40px;width:210px;z-index:100;background:#dedacc;color:#242424;padding:10px;border-radius:4px;font-size:14px;border:1px solid #888}
+#chat-sample .dice-formula,#chat-sample .dice-total{border:1px solid #aaa;background:#bab9ad;text-align:center;padding:7px;border-radius:3px}#chat-sample .dice-flavor{margin-bottom:5px}
+#target-hitbox{position:absolute;left:385px;bottom:20px;width:70px;height:70px;z-index:1;pointer-events:all;opacity:0;cursor:pointer}
+</style></head><body class="vtt game theme-dark"><canvas id="board"></canvas>
+<aside id="controls"><strong>Local feature fixture · native templates / PIXI</strong><div id="feature-settings"></div><button id="open-dialogs">Open native dialogs</button><button id="tools-dialog">Open Tools dialog</button><button id="select-target">Target defender</button><button id="player-view">Switch to player view</button><button id="show-distance">Show token distance</button><button id="run-checks">Run insight checks</button><div id="checks-result">Ready</div></aside>
+<button id="target-hitbox" aria-label="Hover target token"></button>
+<article id="chat-sample" class="chat-message"><strong>Player Character</strong><div class="message-content"><div class="swade-roll"><div class="dice-roll trait-roll"><div class="dice-flavor">Fighting Skill Test</div><div class="dice-result"><div class="dice-formula">2 &nbsp; 5</div><div class="dice-total">5</div></div></div></div></div></article>
+<script type="module" src="/dev/insights-preview.js"></script></body></html>

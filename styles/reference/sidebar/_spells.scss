@@ -1,0 +1,61 @@
+#swade-hud-sidebar[data-type="spells"] {
+    .item {
+        .extras {
+            gap: 2em;
+
+            [data-section="category"] {
+                min-width: 3em;
+                gap: 0.2em;
+            }
+
+            .actions {
+                display: flex;
+                align-items: center;
+                gap: 0.2em;
+
+                .disabled {
+                    color: var(--color-disabled);
+                }
+
+                .numbers {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.2em;
+                    margin-right: -0.2em;
+
+                    span + input {
+                        background: none;
+                    }
+                }
+
+                .unequipped {
+                    font-size: 0.93em;
+                    opacity: 0.5;
+                    margin-right: 1px;
+                }
+
+                [data-action="dailies-retrain"] {
+                    margin-right: 1px;
+                }
+
+                .cast,
+                [data-action="toggle-slot-expended"] {
+                    margin-top: 1px;
+                }
+            }
+        }
+
+        &.inactive {
+            .image {
+                filter: grayscale(1);
+            }
+
+            .details {
+                .name {
+                    color: var(--color-disabled);
+                    text-decoration: line-through;
+                }
+            }
+        }
+    }
+}

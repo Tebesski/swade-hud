@@ -1,0 +1,30 @@
+{
+   "id": "swade-hud",
+   "title": "SWADE HUD",
+   "description": "The only SWADE HUD module you need.",
+   "version": "1.0.0",
+   "compatibility": {
+      "minimum": "14.361",
+      "verified": "14.369"
+   },
+   "relationships": {
+      "systems": [
+         {
+            "id": "swade",
+            "type": "system",
+            "compatibility": {
+               "minimum": "6.0.0"
+            }
+         }
+      ]
+   },
+   "esmodules": ["scripts/main.js"],
+   "styles": ["styles/swade-hud.css"],
+   "languages": [
+      {
+         "lang": "en",
+         "name": "English",
+         "path": "lang/en.json"
+      }
+   ]
+}

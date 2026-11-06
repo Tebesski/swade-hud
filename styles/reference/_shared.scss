@@ -1,0 +1,179 @@
+.swade-hud-element {
+    --outer-background-color: #4d4d4d;
+    --outer-background: url("../../../ui/denim075.png") repeat var(--outer-background-color);
+    --outer-border-color: #111111;
+    --outer-border-radius: 4px;
+    --outer-border-width: 1px;
+    --outer-border: var(--outer-border-width) solid var(--outer-border-color);
+    --outer-box-shadow-blur: 20px;
+    --outer-box-shadow-color: #111111;
+    --outer-box-shadow: 0 0 var(--outer-box-shadow-blur) var(--outer-box-shadow-color);
+    --outer-padding: 4px;
+
+    --inner-border-radius: 3px;
+
+    --tooltip-background: var(--outer-background);
+    --tooltip-border-color: #877a35;
+    --tooltip-border-width: 1px;
+    --tooltip-border: var(--tooltip-border-width) solid var(--tooltip-border-color);
+    --tooltip-box-shadow-blur: 10px;
+    --tooltip-box-shadow-color: var(--outer-box-shadow-color);
+    --tooltip-box-shadow: 0 0 var(--tooltip-box-shadow-blur) var(--tooltip-box-shadow-color);
+    --tooltip-color: #fbe1b7;
+    --tooltip-padding: 0.5em 0.6em;
+
+    --color-accent: #c54c4c;
+    --color-active: #db2828;
+    --color-alt: #cbcbc3;
+    --color-darker: #999;
+    --color-disabled: #ffffff4f;
+    --color-highlight: #ffffff;
+    --color-reversed: #191919;
+    --color: #efe6d8;
+
+    --header-border: 1px solid #ffffff1f;
+    --header-background: #1e1e1e;
+
+    --input-background: #ffffff0f;
+    --input-width-small: 1.8em;
+    --input-width: 2.4em;
+
+    --icon-color: #d4d7de;
+    --icon-width: 1.4em;
+
+    --sidebar-external-padding: 10px;
+
+    --disabled-opacity: 0.4;
+    --hud-font-size: var(--font-size-15);
+    --other-side: calc(100% + var(--outer-padding));
+
+    color: var(--color);
+    font-family: "Signika", sans-serif;
+    font-size: var(--hud-font-size);
+    scale: var(--ui-scale);
+
+    [data-panel] {
+        a.inactive {
+            i {
+                color: var(--color-disabled);
+            }
+        }
+    }
+
+    i {
+        width: var(--icon-width);
+        text-align: center;
+
+        &.fa-battery-three-quarters {
+            transform: rotateZ(-90deg);
+        }
+    }
+
+    input[type="text"],
+    input[type="number"] {
+        color: var(--color);
+        border: none;
+    }
+
+    input[type="number"],
+    input[type="text"].text-number {
+        height: 1.2em;
+        width: var(--input-width);
+        flex: 0 0 var(--input-width);
+        padding: 0;
+        text-align: center;
+        background: var(--input-background);
+
+        &.small {
+            width: var(--input-width-small);
+            flex: 0 0 var(--input-width-small);
+        }
+    }
+
+    header {
+        position: relative;
+        background: var(--header-background);
+        border: var(--header-border);
+        border-left: 0;
+        border-right: 0;
+        padding-block: 0.2em;
+
+        .name {
+            text-align: center;
+        }
+    }
+
+    .slider {
+        justify-self: center;
+        display: grid;
+        align-items: center;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0.1em;
+
+        i.carret {
+            width: unset;
+            font-size: 0.6em;
+
+            &.disabled {
+                color: var(--color-disabled);
+            }
+        }
+
+        i.icon {
+            width: unset;
+        }
+
+        &.disabled {
+            i.carret {
+                color: var(--color-disabled);
+            }
+        }
+    }
+
+    [data-sidebar] {
+        &.disabled {
+            opacity: var(--disabled-opacity);
+        }
+
+        &.active {
+            i {
+                color: var(--color-active);
+                text-shadow: none;
+            }
+        }
+    }
+}
+
+#tooltip.swade-hud-element {
+    color: var(--tooltip-color);
+    border: var(--tooltip-border);
+    box-shadow: var(--tooltip-box-shadow);
+    padding: var(--tooltip-padding);
+    background: var(--outer-background);
+
+    h4 {
+        font-size: 1.3em;
+        margin-bottom: 0.3em;
+    }
+
+    ul {
+        margin: 0;
+    }
+
+    &.iconed-list {
+        ul {
+            list-style: none;
+            padding: 0 0.2em 0 0;
+
+            li {
+                display: flex;
+                align-items: center;
+                gap: 0.3em;
+            }
+        }
+    }
+
+    &.no-width {
+        max-width: unset;
+    }
+}

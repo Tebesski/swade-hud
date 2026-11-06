@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base href="/">
+  <title>SWADE HUD · PF2e layout preview</title>
+  <link rel="stylesheet" href="/css/foundry2.css">
+  <link rel="stylesheet" href="/fonts/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/modules/swade-hud/styles/swade-hud.css">
+  <link rel="stylesheet" href="/systems/swade/styles/swade.css">
+  <link rel="stylesheet" href="/modules/swade-better-templates/styles/module.css">
+  <style>
+    html,body { width:100%; height:100%; margin:0; }
+    body { background: #393c35; --ui-scale:1; --z-index-app:30; --z-index-tooltip:9999; }
+    body::before { content:""; position:absolute; inset:0; opacity:.25;
+      background-image:linear-gradient(#151515 1px,transparent 1px),linear-gradient(90deg,#151515 1px,transparent 1px);
+      background-size:70px 70px; pointer-events:none; }
+    #board { position:absolute; inset:0; width:100%; height:100%; }
+    #interface { position:absolute; inset:0; }
+    #preview-controls { position:fixed; top:10px; right:10px; z-index:100; pointer-events:all;
+      padding:10px; width:250px; font:14px Signika,sans-serif; color:#efe6d8; background:#171717d9; }
+    #preview-controls button { margin:4px 0; width:100%; }
+    #preview-controls label { display:flex; align-items:center; gap:6px; margin:6px 0; }
+    #result { white-space:pre-wrap; max-height:45vh; overflow-y:auto; }
+    #check-summary { margin:6px 0; font-weight:600; }
+  </style>
+</head>
+<body class="vtt game theme-dark">
+  <canvas id="board" aria-label="Scene canvas"></canvas>
+  <div id="interface">
+    <section id="ui-left" class="flexrow">
+      <div id="ui-left-column-1" class="flexcol">
+        <aside id="scene-controls" class="faded-ui">
+          <menu class="flexcol" id="scene-controls-layers">
+            <li><button type="button" class="control ui-control layer icon fa-solid fa-user-large" aria-label="Token Controls"></button></li>
+            <li><button type="button" class="control ui-control layer icon fa-solid fa-block-brick" aria-label="Wall Controls"></button></li>
+            <li><button type="button" class="control ui-control layer icon fa-solid fa-lightbulb" aria-label="Lighting Controls"></button></li>
+          </menu>
+          <menu class="flexcol" id="scene-controls-tools">
+            <li><button type="button" class="control ui-control tool icon fa-solid fa-expand" aria-label="Select Tokens"></button></li>
+            <li><button type="button" class="control ui-control tool icon fa-solid fa-bullseye" aria-label="Select Targets"></button></li>
+          </menu>
+        </aside>
+        <aside id="players" class="flexcol">
+          <div id="players-inactive" class="flexcol">
+            <ol class="players-list plain flexcol"><li class="player flexrow">Offline Player</li></ol>
+          </div>
+          <div id="players-active" class="flexcol">
+            <ol class="players-list plain flexcol" data-tooltip-direction="RIGHT">
+              <li class="player flexrow active gm self"><span class="player-name ellipsis">Gamemaster [GM]</span></li>
+              <li><button type="button" class="item-piles-player-list-trade-button">Request Trade</button></li>
+            </ol>
+            <div id="performance-stats" class="flexrow">
+              <div id="latency" class="good"><label>Latency</label><span class="average">46ms</span></div>
+              <div id="fps" class="good"><label>FPS</label><span class="average">57</span></div>
+              <button id="players-expand" type="button" class="icon fa-solid fa-caret-up" data-action="expand" aria-label="Expand players"></button>
+            </div>
+          </div>
+        </aside>
+      </div>
+      <div id="ui-left-column-2" class="flexcol"></div>
+    </section>
+    <section id="ui-middle" class="flexcol"><div id="ui-top" class="flexcol"></div><div id="ui-bottom" class="flexcol"></div></section>
+    <section id="ui-right" class="flexrow">
+      <div id="ui-right-column-1" class="flexcol"></div>
+      <div id="preview-sidebar" style="width:260px;height:100%;background:#171717d9;pointer-events:all;padding:10px">
+        <button type="button" class="ui-control plain icon fa-solid fa-comments active" data-tab="chat" aria-label="Chat Messages"></button>
+      </div>
+    </section>
+  </div>
+  <aside id="preview-controls" style="right:280px">
+    <strong>Local SWADE fixture · actual HUD renderer</strong>
+    <button id="selection">Deselect token</button>
+    <label><input id="disable-tools-dialogs" type="checkbox">Disable SWADE Tools roll dialogs for SWADE HUD</label>
+    <button id="checks">Run interaction checks</button>
+    <button id="effect-gesture-checks">Run effect gesture checks</button>
+    <button id="effect-hover-checks">Run effect hover checks</button>
+    <button id="cast-and-soak-checks">Run cast and soak checks</button>
+    <div id="check-summary" aria-live="polite"></div>
+    <div id="result">Ready</div>
+  </aside>
+  <script>window.addEventListener("error",event=>{document.querySelector("#result").textContent="ERROR: "+event.message;});</script>
+  <script type="module" src="/dev/preview.js"></script>
+</body>
+</html>

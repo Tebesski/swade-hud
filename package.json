@@ -1,0 +1,14 @@
+{
+  "name": "swade-hud",
+  "private": true,
+  "type": "module",
+  "version": "0.15.8",
+  "scripts": {
+    "test": "node --test dev/*.test.js",
+    "build:css": "sass --style=expanded --no-source-map --silence-deprecation=import,global-builtin styles/swade-hud.scss styles/swade-hud.css",
+    "check": "node --check scripts/main.js && node --check scripts/hud.js && node --check scripts/swade.js && node --check scripts/popup.js && node --check scripts/effects.js && node --check scripts/disposition.js && node --check scripts/modifiers.js && node --check scripts/powers.js && node --check scripts/item-summary.js && node --check scripts/item-actions.js && node --check scripts/scale.js && node --check scripts/size-reference.js && node --check scripts/settings.js && node --check scripts/tools-chat.js && node --check scripts/tools-dialogs.js && node --check scripts/bennies.js && node --check scripts/distance.js && node --check scripts/roll-statistics.js && node --check scripts/roll-insights.js && node --check scripts/tools-forecast.js && node --check scripts/target-forecast.js"
+  },
+  "devDependencies": {
+    "sass": "^1.98.0"
+  }
+}
