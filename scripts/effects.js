@@ -31,7 +31,9 @@ export function actorEffects(actor) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 export function activeEffects(actor) {
-  return actorEffects(actor).filter((effect) => effect.active !== false && !effect.disabled && !effect.isSuppressed);
+  const neverShowIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0;
+  return actorEffects(actor).filter((effect) => effect.showIcon !== neverShowIcon
+    && effect.active !== false && !effect.disabled && !effect.isSuppressed);
 }
 
 const deletionPrompts = new WeakSet();
