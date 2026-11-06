@@ -2,7 +2,7 @@
    "id": "swade-hud",
    "title": "SWADE HUD",
    "description": "The only SWADE HUD module you need.",
-   "version": "1.0.0",
+   "version": "#{VERSION}#",
    "compatibility": {
       "minimum": "14.361",
       "verified": "14.369"
@@ -26,5 +26,8 @@
          "name": "English",
          "path": "lang/en.json"
       }
-   ]
+   ],
+   "url": "#{URL}#",
+   "manifest": "#{MANIFEST}#",
+   "download": "#{DOWNLOAD}#"
 }
