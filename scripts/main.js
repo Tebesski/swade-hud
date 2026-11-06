@@ -1,6 +1,6 @@
 import { SwadeHUD } from "./hud.js";
 import { MODULE_ID, useItem } from "./swade.js";
-import { onSizeEffectChange } from "./scale.js";
+import { initializePrototypeSize, onActorSizeChange, onSizeEffectChange, preparePrototypeSizeUpdate } from "./scale.js";
 import { registerSettings, migrateSettings } from "./settings.js";
 import { bennyPool } from "./bennies.js";
 import { decorateToolsChatMessage } from "./tools-chat.js";
@@ -27,6 +27,11 @@ Hooks.on("renderApplicationV2", (app, html) => {
   patchTargetedDamageDialog(app, html);
 });
 const syncSizeEffect = (effect, userId) => onSizeEffectChange(effect, userId).catch((error) => hud.report(error));
+Hooks.on("preCreateActor", initializePrototypeSize);
+Hooks.on("preUpdateActor", preparePrototypeSizeUpdate);
+Hooks.on("updateActor", (actor, changes, options, userId) => {
+  onActorSizeChange(actor, changes, options, userId).catch((error) => hud.report(error));
+});
 Hooks.on("createActiveEffect", (effect, _options, userId) => syncSizeEffect(effect, userId));
 Hooks.on("updateActiveEffect", (effect, _changed, _options, userId) => syncSizeEffect(effect, userId));
 Hooks.on("deleteActiveEffect", (effect, _options, userId) => syncSizeEffect(effect, userId));

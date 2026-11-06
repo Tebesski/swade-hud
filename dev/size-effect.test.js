@@ -1,6 +1,99 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { applySizeChange, onSizeEffectChange } from "../scripts/scale.js";
+import {
+  applySizeChange, initializePrototypeSize, onActorSizeChange, onSizeEffectChange, preparePrototypeSizeUpdate,
+} from "../scripts/scale.js";
+
+describe("permanent Size synchronization", () => {
+  const makeActor = () => ({
+    uuid: "Actor.test", type: "npc", isOwner: true,
+    system: { stats: { size: 0 } }, _source: { system: { stats: { size: 0 } } },
+    prototypeToken: { width: 1, height: 1 }, getDependentTokens: () => [],
+  });
+
+  it("saves the prototype footprint along with a Size edit on an unplaced actor", async () => {
+    const actor = makeActor();
+    const update = { system: { stats: { size: 6 } }, prototypeToken: { name: "Giant" } };
+    preparePrototypeSizeUpdate(actor, update);
+    assert.deepEqual(update.prototypeToken, { name: "Giant", width: 3, height: 3 });
+
+    actor.update = async (changes) => {
+      preparePrototypeSizeUpdate(actor, changes);
+      Object.assign(actor.prototypeToken, changes.prototypeToken);
+    };
+    await applySizeChange(actor, null, -2);
+    assert.deepEqual(actor.prototypeToken, { width: 0.8, height: 0.8 });
+  });
+
+  it("sizes new actors and leaves standalone prototype edits alone", () => {
+    const actor = makeActor();
+    actor.type = "vehicle";
+    actor._source.system = { size: 12 };
+    actor.updateSource = ({ prototypeToken }) => Object.assign(actor.prototypeToken, prototypeToken);
+    initializePrototypeSize(actor);
+    assert.deepEqual(actor.prototypeToken, { width: 5, height: 5 });
+    const update = { system: { size: 12 }, prototypeToken: { width: 4 } };
+    preparePrototypeSizeUpdate(actor, update);
+    assert.deepEqual(update.prototypeToken, { width: 4 });
+  });
+
+  it("resizes linked scene documents and keeps timed footprints specific to their token", async () => {
+    globalThis.game = { user: { id: "owner" } };
+    const actor = makeActor();
+    const makeToken = (uuid) => ({
+      uuid, actor, isOwner: true, width: 1, height: 1,
+      async update(changes) { Object.assign(this, changes); },
+    });
+    const local = makeToken("Scene.active.Token.test");
+    const remote = makeToken("Scene.inactive.Token.test");
+    actor.system.stats.size = 9;
+    actor.effects = [{ active: true, flags: { "swade-hud": { sizeChange: { tokenUuid: local.uuid } } } }];
+    actor.getDependentTokens = (options) => {
+      assert.deepEqual(options, { linked: true, concreteOnly: true });
+      return [local, remote];
+    };
+    await onActorSizeChange(actor, { system: { stats: { size: 3 } } }, {}, "another-user");
+    assert.deepEqual([local.width, remote.width], [1, 1]);
+    await onActorSizeChange(actor, { system: { stats: { size: 3 } } }, {}, "owner");
+    assert.deepEqual([local.width, remote.width], [4, 2]);
+  });
+
+  it("resizes a synthetic actor's own token without writing a prototype", async () => {
+    globalThis.game = { user: { id: "owner" } };
+    const actor = makeActor();
+    actor.isToken = true;
+    actor.system.stats.size = -3;
+    actor.token = { uuid: "Scene.inactive.Token.test", actor, isOwner: true, width: 1, height: 1,
+      async update(changes) { Object.assign(this, changes); } };
+    const changes = { system: { stats: { size: -3 } } };
+    preparePrototypeSizeUpdate(actor, changes);
+    assert.equal(changes.prototypeToken, undefined);
+    await onActorSizeChange(actor, changes, {}, "owner");
+    assert.deepEqual([actor.token.width, actor.token.height], [0.5, 0.5]);
+  });
+
+  it("finishes at the newest footprint when two edits overlap", async () => {
+    globalThis.game = { user: { id: "owner" } };
+    const actor = makeActor();
+    const firstStarted = Promise.withResolvers();
+    const firstCanFinish = Promise.withResolvers();
+    const token = { uuid: "Scene.inactive.Token.test", actor, isOwner: true, width: 1, height: 1,
+      async update(changes) {
+        if (changes.width === 2) {
+          firstStarted.resolve();
+          await firstCanFinish.promise;
+        }
+        Object.assign(this, changes);
+      } };
+    actor.getDependentTokens = () => [token];
+    const first = onActorSizeChange(actor, { "system.stats.size": 2 }, {}, "owner");
+    await firstStarted.promise;
+    const second = onActorSizeChange(actor, { "system.stats.size": 0 }, {}, "owner");
+    firstCanFinish.resolve();
+    await Promise.all([first, second]);
+    assert.deepEqual([token.width, token.height], [1, 1]);
+  });
+});
 
 describe("optional timed size changes",()=>{
   let actor,token,created,updates;
@@ -8,6 +101,7 @@ describe("optional timed size changes",()=>{
     created=[];updates=[];
     globalThis.game={user:{id:"owner"}};
     actor={uuid:"Actor.test",type:"character",isOwner:true,system:{stats:{size:0}},_source:{system:{stats:{size:0}}},
+      prototypeToken:{width:1,height:1},
       update:async(data)=>{updates.push(data);actor.system.stats.size=data["system.stats.size"];},
       createEmbeddedDocuments:async(type,data)=>{
         assert.equal(type,"ActiveEffect");
@@ -26,6 +120,7 @@ describe("optional timed size changes",()=>{
       await applySizeChange(actor,token,9,{duration:3,units});
       assert.equal(actor._source.system.stats.size,0);
       assert.equal(actor.system.stats.size,9);
+      assert.deepEqual(actor.prototypeToken,{width:1,height:1});
       assert.equal(created.length,1);
       assert.deepEqual(created[0].duration,{value:3,units,expiry:"turnEnd"});
       assert.equal(created[0].system.removeEffect,true);

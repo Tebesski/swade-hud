@@ -60,7 +60,7 @@
   grid-template-columns:
     [full-start menu-start] var(--columns-icon)
     [menu-end portrait-start] var(--columns-portrait)
-    [portrait-end info-start info-end statistics-start] var(--column-2fr)
+    [portrait-end info-start info-end statistics-start] auto
     [statistics-end resources-start] var(--column-1fr)
     [resources-end sidebars-start] 10.434em
     [sidebars-end stretch-start] auto
@@ -78,8 +78,24 @@
   [data-panel="resources"] .slider { grid-template-columns: auto; }
   .resource-icon, .resource-value, [data-modifier] { cursor: pointer; }
   .toughness-values { white-space: nowrap; }
-  [data-panel="statistics"] > a { justify-content: space-between; }
-  [data-panel="name"] span { overflow: hidden; text-overflow: ellipsis; }
+  [data-panel="statistics"] > a {
+    justify-content: space-between;
+    gap: 0.2em;
+    > i + span {
+      flex: 0 0 auto;
+      width: auto;
+      min-width: var(--input-width-small);
+    }
+  }
+  [data-panel="name"] {
+    white-space: normal;
+    text-align: center;
+    span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      text-wrap: balance;
+    }
+  }
   [data-panel="shortcuts"] { grid-auto-columns: var(--shortcut-width); }
   [data-panel="shortcuts"] .shortcut { height: var(--shortcut-width); pointer-events: all; }
   [data-panel="shortcuts"] .shortcut .image { background-position: center; }

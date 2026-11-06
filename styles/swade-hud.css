@@ -2337,7 +2337,7 @@ aside.swade-hud-effect-info .description .addendum p {
   z-index: var(--z-index-app, 30);
 }
 #swade-hud-persistent {
-  grid-template-columns: [full-start menu-start] var(--columns-icon) [menu-end portrait-start] var(--columns-portrait) [portrait-end info-start info-end statistics-start] var(--column-2fr) [statistics-end resources-start] var(--column-1fr) [resources-end sidebars-start] 10.434em [sidebars-end stretch-start] auto [stretch-end full-end];
+  grid-template-columns: [full-start menu-start] var(--columns-icon) [menu-end portrait-start] var(--columns-portrait) [portrait-end info-start info-end statistics-start] auto [statistics-end resources-start] var(--column-1fr) [resources-end sidebars-start] 10.434em [sidebars-end stretch-start] auto [stretch-end full-end];
 }
 #swade-hud-persistent [data-panel=stats] {
   font-weight: 600;
@@ -2377,10 +2377,21 @@ aside.swade-hud-effect-info .description .addendum p {
 }
 #swade-hud-persistent [data-panel=statistics] > a {
   justify-content: space-between;
+  gap: 0.2em;
+}
+#swade-hud-persistent [data-panel=statistics] > a > i + span {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: var(--input-width-small);
+}
+#swade-hud-persistent [data-panel=name] {
+  white-space: normal;
+  text-align: center;
 }
 #swade-hud-persistent [data-panel=name] span {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 #swade-hud-persistent [data-panel=shortcuts] {
   grid-auto-columns: var(--shortcut-width);

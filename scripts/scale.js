@@ -1,6 +1,8 @@
 import { renderSizeReference } from "./size-reference.js";
 import { MODULE_ID } from "./swade.js";
 
+const tokenResizes = new WeakMap();
+
 function sizePath(actor) {
   if (actor?.type === "vehicle") return "size";
   if (["character", "npc"].includes(actor?.type)) return "stats.size";
@@ -23,6 +25,47 @@ export function tokenFootprint(size) {
   if (size === 12) return 5;
   return 6;
 }
+
+function changedSize(actor, changes) {
+  const path = sizePath(actor);
+  if (path) return changes["system." + path] ?? readSize(changes.system, path);
+}
+
+export function preparePrototypeSizeUpdate(actor, changes) {
+  if (actor.isToken || !actor.prototypeToken) return;
+  const size = changedSize(actor, changes);
+  if (!Number.isSafeInteger(size) || size === readSize(actor._source.system, sizePath(actor))) return;
+  const footprint = tokenFootprint(size);
+  // Save the prototype footprint atomically with the permanent actor Size.
+  Object.assign(changes.prototypeToken ??= {}, { width: footprint, height: footprint });
+}
+
+export function initializePrototypeSize(actor) {
+  const path = sizePath(actor);
+  if (actor.isToken || !actor.prototypeToken || !path) return;
+  const size = readSize(actor._source.system, path);
+  if (!Number.isSafeInteger(size)) return;
+  const footprint = tokenFootprint(size);
+  if (footprint !== 1) actor.updateSource({ prototypeToken: { width: footprint, height: footprint } });
+}
+
+export async function onActorSizeChange(actor, changes, options, userId) {
+  if (userId !== game.user.id || !actor.isOwner) return;
+  const size = changedSize(actor, changes);
+  if (!Number.isSafeInteger(size)) return;
+  const tokens = actor.isToken ? [actor.token] : actor.getDependentTokens({ linked: true, concreteOnly: true });
+  const timedTargets = new Set();
+  for (const effect of actor.effects ?? []) {
+    const uuid = effect.flags?.[MODULE_ID]?.sizeChange?.tokenUuid;
+    if (uuid && effect.active) timedTargets.add(uuid);
+  }
+  await Promise.all(tokens.map((token) => {
+    if (!token || token.uuid === options.swadeHudResizeToken) return;
+    const tokenSize = actor.isToken || timedTargets.has(token.uuid) ? actorSize(actor) : size;
+    return syncTokenSize(actor, token, tokenSize);
+  }));
+}
+
 export async function adjustScale(actor, token, delta) {
   if (![-1, 1].includes(delta)) return;
   if (!actor) return;
@@ -34,16 +77,29 @@ export async function setActorSize(actor, token, size) {
   // Preserve any active-effect contribution to Size, just as resource edits do.
   const delta = size - actorSize(actor);
   const source = Number(readSize(actor._source?.system, path));
-  await actor.update({ ["system." + path]: (Number.isFinite(source) ? source : actorSize(actor)) + delta });
-  const footprint = tokenFootprint(size);
-  if (token) await token.update({ width: footprint, height: footprint });
+  const updated = await actor.update({ ["system." + path]: (Number.isFinite(source) ? source : actorSize(actor)) + delta },
+    { swadeHudResizeToken: token?.uuid });
+  if (token && (updated || actorSize(actor) === size)) await resizeToken(token, size);
 }
 
-async function syncTokenSize(actor, token) {
+function syncTokenSize(actor, token, size = actorSize(actor)) {
   if (!actor?.isOwner || !token?.isOwner || token.actor?.uuid !== actor.uuid) return;
-  const footprint = tokenFootprint(actorSize(actor));
-  if (token.width !== footprint || token.height !== footprint) {
-    await token.update({ width: footprint, height: footprint });
+  return resizeToken(token, size);
+}
+
+async function resizeToken(token, size) {
+  const footprint = tokenFootprint(size);
+  // Check dimensions after the previous write so a fast reversal is not skipped.
+  const previous = tokenResizes.get(token) ?? Promise.resolve();
+  const resize = previous.catch(() => {}).then(() => {
+    if (token.width !== footprint || token.height !== footprint) {
+      return token.update({ width: footprint, height: footprint });
+    }
+  });
+  tokenResizes.set(token, resize);
+  try { await resize; }
+  finally {
+    if (tokenResizes.get(token) === resize) tokenResizes.delete(token);
   }
 }
 
