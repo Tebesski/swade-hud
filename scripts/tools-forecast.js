@@ -1,3 +1,5 @@
+import { importSwadeTools } from "./tools-imports.js";
+
 const pending = [];
 const contexts = new WeakMap();
 let classes;
@@ -23,12 +25,8 @@ export function toolsForecastContext(app, root) {
   return context;
 }
 async function toolsClasses() {
-  return classes ??= import("/modules/swade-tools/scripts/gb.js").then(() => Promise.all([
-    import("/modules/swade-tools/scripts/class/CharRoll.js"),
-    import("/modules/swade-tools/scripts/class/ItemRoll.js"),
-    import("/modules/swade-tools/scripts/gb.js"),
-    import("/modules/swade-tools/scripts/class/Char.js"),
-  ])).then(([char, item, gb, actor]) => ({ CharRoll: char.default, ItemRoll: item.default, Char: actor.default, gb }));
+  return classes ??= importSwadeTools("scripts/class/CharRoll.js", "scripts/class/ItemRoll.js", "scripts/gb.js", "scripts/class/Char.js")
+    .then(([char, item, gb, actor]) => ({ CharRoll: char.default, ItemRoll: item.default, Char: actor.default, gb }));
 }
 export async function toolsTargetDefense(actor, kind) {
   const { Char, gb } = await toolsClasses();
