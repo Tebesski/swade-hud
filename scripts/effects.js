@@ -1,4 +1,6 @@
-import { localize, statusDefinition, statusDefinitions } from "./swade.js";
+import { ATTRIBUTES, localize, statusDefinition, statusDefinitions } from "./swade.js";
+
+const SHOW_ICON_ALWAYS = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -126,12 +128,34 @@ export async function statusEffectDocument(actor, statusId) {
 }
 
 const timedStatuses = new WeakMap();
+function isDefeatedStatus(statusId) {
+  return statusId === (CONFIG.specialStatusEffects?.DEFEATED ?? "dead");
+}
+
+async function removeDefeatedCombatant(actor, token, statusId) {
+  const combatant = token?.combatant;
+  if (combatant && combatant.token === token && token.actor?.uuid === actor.uuid && actor.statuses.has(statusId)) {
+    await combatant.delete();
+  }
+}
+
+export async function toggleHudStatus(actor, token, statusId) {
+  if (!actor?.isOwner) return;
+  if (!isDefeatedStatus(statusId)) return actor.toggleActiveEffect(statusId);
+  const definition = statusDefinition(statusId);
+  if (!definition) return;
+  // A permanent effect must also opt into icon rendering for its overlay to draw.
+  const applied = await actor.toggleActiveEffect({ ...definition, showIcon: SHOW_ICON_ALWAYS }, { overlay: true });
+  if (applied) await removeDefeatedCombatant(actor, token, statusId);
+  return applied;
+}
+
 function timedStatusEffect(actor, definition) {
   const statuses = new Set([definition.id, ...(definition.statuses ?? [])]);
   return actor.effects.find((effect) => effect.type !== "modifier" && ((definition._id && effect.id === definition._id)
     || effect.statuses?.size === statuses.size && [...statuses].every((status) => effect.statuses.has(status))));
 }
-export async function applyTimedStatus(actor, statusId, value, units) {
+export async function applyTimedStatus(actor, statusId, value, units, token = actor?.token) {
   const definition = actor?.isOwner && statusDefinition(statusId);
   if (!definition) return;
   if (!Number.isSafeInteger(value) || value <= 0 || !["rounds", "minutes", "hours"].includes(units)) {
@@ -143,21 +167,26 @@ export async function applyTimedStatus(actor, statusId, value, units) {
   const operation = (async () => {
     const duration = { value, units, expiry: "turnEnd", expired: false };
     const start = CONFIG.ActiveEffect.documentClass.getEffectStart();
-    const existing = timedStatusEffect(actor, definition);
-    if (existing) {
-      await existing.update({ disabled: false, duration, start, "system.removeEffect": true });
-      return existing;
+    const defeated = isDefeatedStatus(statusId);
+    let effect = timedStatusEffect(actor, definition);
+    if (effect) {
+      const changes = { disabled: false, duration, start, "system.removeEffect": true };
+      if (defeated) Object.assign(changes, { showIcon: SHOW_ICON_ALWAYS, "flags.core.overlay": true });
+      await effect.update(changes);
+    } else {
+      // Keep SWADE's canonical changes, callbacks and related statuses.
+      const data = foundry.utils.deepClone(definition);
+      data.duration = duration;
+      data.start = start;
+      data.disabled = false;
+      data.transfer = false;
+      data.system = { ...data.system, removeEffect: true };
+      if (defeated) data.showIcon = SHOW_ICON_ALWAYS;
+      await actor.toggleActiveEffect(data, defeated ? { active: true, overlay: true } : { active: true });
+      effect = timedStatusEffect(actor, definition);
     }
-    // Use SWADE's canonical definition so changes, callbacks, related statuses
-    // and optional-module hooks are preserved. Never mutate CONFIG.statusEffects.
-    const data = foundry.utils.deepClone(definition);
-    data.duration = duration;
-    data.start = start;
-    data.disabled = false;
-    data.transfer = false;
-    data.system = { ...data.system, removeEffect: true };
-    await actor.toggleActiveEffect(data, { active: true });
-    return timedStatusEffect(actor, definition);
+    if (defeated && effect?.active) await removeDefeatedCombatant(actor, token, statusId);
+    return effect;
   })();
   pending.set(statusId, operation);
   try { return await operation; }
@@ -165,7 +194,7 @@ export async function applyTimedStatus(actor, statusId, value, units) {
 }
 
 let nextTimedStatusDialog = 0;
-export function showTimedStatusDialog(actor, statusId) {
+export function showTimedStatusDialog(actor, statusId, token) {
   const definition = actor?.isOwner && statusDefinition(statusId);
   if (!definition) return;
   const content = node("div", "form-group");
@@ -185,7 +214,7 @@ export function showTimedStatusDialog(actor, statusId) {
     buttons: [
       { action: "apply", label: "Apply", icon: "fa-solid fa-check", default: true, callback: (_event, button) => {
         const fields = button.form.elements;
-        return applyTimedStatus(actor, statusId, fields.namedItem("duration").valueAsNumber, fields.namedItem("units").value);
+        return applyTimedStatus(actor, statusId, fields.namedItem("duration").valueAsNumber, fields.namedItem("units").value, token);
       } },
       { action: "cancel", label: "Cancel", icon: "fa-solid fa-xmark", callback: () => {} },
     ],
@@ -217,6 +246,12 @@ export function changeLabel(change, actor) {
     "system.actions.traitMod": "Trait modifier", "system.actions.dmgMod": "Damage modifier",
   };
   if (change.label || labels[change.key]) return change.label || labels[change.key];
+  const linked = ATTRIBUTES.find(([key]) => change.key === "system.stats.globalMods." + key);
+  if (linked) {
+    const [key, label] = linked;
+    const name = key[0].toUpperCase() + key.slice(1);
+    return localize("SWADE.GlobalMod." + name, localize(label, name) + " and linked Skills");
+  }
   const skill = /^@Skill\{([^}]+)\}\[(.+)\]$/i.exec(change.key);
   if (skill) return (actor?.items.get(skill[1])?.name ?? skill[1]) + " · " + changeLabel({key:skill[2]});
   const attribute = /^system\.attributes\.([^.]+)\.die\.(modifier|sides)$/.exec(change.key);

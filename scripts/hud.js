@@ -5,7 +5,7 @@ import {
   hasSwadeToolsItemDialog, openSwadeToolsItemDialog,
 } from "./swade.js";
 import { createItemPopup } from "./popup.js";
-import { EffectPanels, actorEffects, confirmEffectDeletion, nonSystemEffects, effectDuration, findStatusEffect, openStatusEffect, statusEffectDocument, showTimedStatusDialog, reactionEffect, toggleReactionEffect } from "./effects.js";
+import { EffectPanels, actorEffects, confirmEffectDeletion, nonSystemEffects, effectDuration, findStatusEffect, openStatusEffect, statusEffectDocument, showTimedStatusDialog, toggleHudStatus, reactionEffect, toggleReactionEffect } from "./effects.js";
 import { dispositionDetails, showDispositionDialog } from "./disposition.js";
 import { powerTemplates, placePowerTemplate, isTemplateRange, isBoostLowerTrait, powerPoolUsesNoPP, powerCostPresentation } from "./powers.js";
 import { showModifierDialog } from "./modifiers.js";
@@ -988,7 +988,8 @@ export class SwadeHUD {
         return this.adjustCounter(data.key, data.pool, 1);
       case "disposition": return showDispositionDialog(this.token?.document, target);
       case "status": return event.shiftKey && target.closest(".system-effect-list")
-        ? showTimedStatusDialog(this.actor, data.status) : this.actor.toggleActiveEffect(data.status);
+        ? showTimedStatusDialog(this.actor, data.status, this.token?.document)
+        : toggleHudStatus(this.actor, this.token?.document, data.status);
       case "effect-toggle": {
         const effect = actorEffects(this.actor).find((effect) => effect.uuid === data.effectUuid);
         if (effect && !effect.isSuppressed) {

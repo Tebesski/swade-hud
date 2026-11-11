@@ -42,7 +42,12 @@ export async function createModifierEffect(actor, token, spec, values, direction
   if (!amount && !running && !armour) throw new Error("Enter a non-zero modifier.");
   const change = (key, value) => ({ key, type: "add", value: direction * value, phase: "initial" });
   const changes = [];
-  if (amount) changes.push(change(target.key, amount));
+  if (amount) {
+    // SWADE applies this modifier to the attribute and to skills linked to it.
+    const key = spec.kind === "attribute" && values.linkedSkills
+      ? "system.stats.globalMods." + spec.key : target.key;
+    changes.push(change(key, amount));
+  }
   if (running) changes.push(change("system.pace.running.mod", running));
   if (armour) changes.push(change("system.stats.toughness.armor", armour));
   const name = (direction > 0 ? "Boost " : "Lower ") + target.label;
@@ -73,6 +78,17 @@ export async function showModifierDialog(actor, token, spec) {
     content.append(row);
   };
   numberField("amount", target.pace ? "Pace adjustment" : target.armour ? "Toughness adjustment" : target.label + " adjustment", target.armour ? 0 : 2, 0);
+  if (spec.kind === "attribute") {
+    const row = document.createElement("div");
+    row.className = "form-group";
+    const label = document.createElement("label");
+    label.textContent = "All linked Skills";
+    const input = document.createElement("input");
+    Object.assign(input, { name: "linkedSkills", type: "checkbox", id: dialogId + "-linked-skills" });
+    label.htmlFor = input.id;
+    row.append(label, input);
+    content.append(row);
+  }
   if (target.pace) numberField("running", "Running die adjustment", 0, 0);
   if (target.armour) numberField("armour", "Armour adjustment", 0, 0);
   numberField("duration", "Duration", 5, 1);
@@ -96,6 +112,7 @@ export async function showModifierDialog(actor, token, spec) {
     const form = button.form;
     return {
       amount: form.elements.namedItem("amount").valueAsNumber,
+      linkedSkills: form.elements.namedItem("linkedSkills")?.checked ?? false,
       running: form.elements.namedItem("running")?.valueAsNumber ?? 0,
       armour: form.elements.namedItem("armour")?.valueAsNumber ?? 0,
       duration: form.elements.namedItem("duration").valueAsNumber,

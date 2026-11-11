@@ -17,7 +17,10 @@ function selectedModifiers(item, choices, root) {
       add(effect.id, effect.name, effect.flags?.["swade-better-powers"]?.modifierId ?? effect.flags?.["swade-better-setting"]?.modifierId);
     }
   }
-  for (const modifier of item.flags?.["swade-better-powers"]?.powerModifiers ?? item.flags?.["swade-better-setting"]?.powerModifiers ?? []) {
+  const powers = globalThis.game?.modules?.get?.("swade-better-powers");
+  const modifiers = (powers?.active ? powers.api?.getModifiers?.(item) : null)
+    ?? item.flags?.["swade-better-powers"]?.powerModifiers ?? item.flags?.["swade-better-setting"]?.powerModifiers ?? [];
+  for (const modifier of modifiers) {
     const optionId = choices?.get(modifier.id);
     if (!optionId) continue;
     options.push([modifier.id, optionId]);

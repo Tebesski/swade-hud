@@ -16,7 +16,8 @@
                "minimum": "6.0.0"
             }
          }
-      ]
+      ],
+      "requires": [{ "id": "swade-better-setting", "type": "module" }]
    },
    "esmodules": ["scripts/main.js"],
    "styles": ["styles/swade-hud.css"],

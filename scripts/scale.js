@@ -1,5 +1,7 @@
 import { renderSizeReference } from "./size-reference.js";
+import { tokenFootprint } from "../../swade-better-setting/scripts/npc-size.mjs";
 import { MODULE_ID } from "./swade.js";
+export { tokenFootprint };
 
 const tokenResizes = new WeakMap();
 
@@ -15,17 +17,6 @@ export function actorSize(actor) {
   const size = Number(readSize(actor.system, sizePath(actor)));
   return Number.isFinite(size) ? Math.trunc(size) : 0;
 }
-export function tokenFootprint(size) {
-  if (size <= -3) return 0.5;
-  if (size === -2) return 0.8;
-  if (size <= 1) return 1;
-  if (size <= 5) return 2;
-  if (size <= 8) return 3;
-  if (size <= 11) return 4;
-  if (size === 12) return 5;
-  return 6;
-}
-
 function changedSize(actor, changes) {
   const path = sizePath(actor);
   if (path) return changes["system." + path] ?? readSize(changes.system, path);
