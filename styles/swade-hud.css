@@ -2337,7 +2337,7 @@ aside.swade-hud-effect-info .description .addendum p {
   z-index: var(--z-index-app, 30);
 }
 #swade-hud-persistent {
-  grid-template-columns: [full-start menu-start] var(--columns-icon) [menu-end portrait-start] var(--columns-portrait) [portrait-end info-start info-end statistics-start] auto [statistics-end resources-start] var(--column-1fr) [resources-end sidebars-start] 10.434em [sidebars-end stretch-start] auto [stretch-end full-end];
+  grid-template-columns: [full-start menu-start] var(--columns-icon) [menu-end portrait-start] var(--columns-portrait) [portrait-end info-start info-end statistics-start] auto [statistics-end resources-start] var(--column-1fr) [resources-end sidebars-start] 12.1em [sidebars-end stretch-start] auto [stretch-end full-end];
 }
 #swade-hud-persistent [data-panel=stats] {
   font-weight: 600;
@@ -2464,23 +2464,19 @@ aside.swade-hud-effect-info .description .addendum p {
   height: 100%;
   object-fit: cover;
 }
-#swade-hud-sidebar .item .attribute-image {
-  display: grid;
-  place-items: center;
-  flex: 0 0 var(--action-image-height);
-  width: var(--action-image-height);
-}
-#swade-hud-sidebar .item .attribute-image i {
-  position: static;
-  width: auto;
-  font-size: 1.25em;
-  line-height: 1;
-}
-#swade-hud-sidebar .item.attack .name img {
-  width: var(--action-image-height);
-}
-#swade-hud-sidebar .item.attack .name {
+#swade-hud-sidebar .item.attack .weapon-heading {
   width: 100%;
+  padding: 0.15em 0.35em;
+  gap: 0.35em;
+}
+#swade-hud-sidebar .item.attack .weapon-heading .image {
+  height: var(--action-image-height);
+  margin: 0;
+}
+#swade-hud-sidebar .item.attack .weapon-heading > a:not(.image) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 #swade-hud-sidebar .item.attack .variants {
   width: 100%;
@@ -2511,6 +2507,115 @@ aside.swade-hud-effect-info .description .addendum p {
   color: var(--color-darker);
   font-size: 0.9em;
 }
+#swade-hud-sidebar [data-action=generate-actions] {
+  display: flex;
+  gap: 0.4em;
+  align-items: center;
+  padding: 0.35em;
+}
+#swade-hud-sidebar .action-star.starred {
+  color: #eac574;
+}
+#swade-hud-sidebar .skill-section {
+  margin-bottom: 0.45em;
+}
+#swade-hud-sidebar .item.skill-heading {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.25em;
+  margin: 0;
+  padding: 0.2em;
+  background: var(--header-background);
+  font: 700 1em var(--sans-serif);
+  text-align: left;
+}
+#swade-hud-sidebar .item.skill-heading .image {
+  margin: 0;
+}
+#swade-hud-sidebar .item.skill-heading .name {
+  min-width: 0;
+  text-align: left;
+}
+#swade-hud-sidebar .item.skill-heading .name a {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+}
+#swade-hud-sidebar .item.skill-heading .skill-title {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#swade-hud-sidebar .item.skill-heading .skill-die {
+  margin: 0;
+  white-space: nowrap;
+}
+#swade-hud-sidebar .item.skill-heading .attribute-name {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+#swade-hud-sidebar .skill-actions-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 1.6em;
+  padding: 0.15em 0.4em;
+  border-bottom: var(--header-border);
+  background: var(--variant-background);
+  color: var(--color-darker);
+}
+#swade-hud-sidebar .skill-actions-toggle[aria-expanded=true] i {
+  rotate: 90deg;
+}
+#swade-hud-sidebar .skill-actions-toggle:hover, #swade-hud-sidebar .skill-actions-toggle:focus-visible {
+  color: var(--color);
+}
+#swade-hud-sidebar .skill-actions-toggle:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+#swade-hud-sidebar .skill-actions {
+  border-inline-start: var(--header-border);
+}
+#swade-hud-sidebar .skill-actions[hidden] {
+  display: none;
+}
+#swade-hud-sidebar .skill-common {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  padding: 0.3em;
+  border-bottom: var(--header-border);
+}
+#swade-hud-sidebar .skill-common a {
+  padding: 0.12em 0.25em;
+  background: var(--variant-background);
+}
+#swade-hud-sidebar .item.trait-action-row {
+  gap: 0.3em;
+  margin: 0;
+  padding: 0.3em;
+  border-bottom: var(--header-border);
+}
+#swade-hud-sidebar .item.trait-action-row > [data-action=choose-action] {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#swade-hud-sidebar .item.trait-action-row .action-star {
+  flex: none;
+}
+#swade-hud-sidebar[data-type=actions] .item-list > :is(header, .hud-attack-options, [data-action=generate-actions]) {
+  column-span: all;
+}
+#swade-hud-sidebar[data-type=items] .item-list > header {
+  break-after: avoid-column;
+}
+#swade-hud-sidebar[data-type=items] .item .name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 #swade-hud-sidebar .power-pool {
   display: inline-flex;
   align-items: center;
@@ -2527,6 +2632,18 @@ aside.swade-hud-effect-info .description .addendum p {
 }
 #swade-hud-sidebar [data-panel=filter] input {
   width: 100%;
+}
+#swade-hud-sidebar[data-type=utilities] .row > a {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.25em 0.35em;
+  border-radius: 2px;
+}
+#swade-hud-sidebar[data-type=utilities] .row > a[aria-pressed=true] {
+  background: var(--variant-background-selected);
+  color: var(--variant-color-selected);
+  box-shadow: var(--variant-box-shadow-selected);
 }
 #swade-hud-sidebar[data-type=spells] .power-row .details {
   grid-template-rows: auto auto;
@@ -2664,6 +2781,40 @@ aside.swade-hud-effect-info .description .addendum p {
 #swade-hud-sidebar[data-type=extras] a:focus-visible {
   outline: 1px solid var(--color-active);
   outline-offset: -1px;
+}
+
+.hud-attack-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em 0.65em;
+  margin-bottom: 0.35em;
+  break-inside: avoid;
+}
+.hud-attack-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  cursor: pointer;
+}
+.hud-attack-options input[type=checkbox] {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.swade-hud-test-note {
+  margin-block: 0.4em;
+  padding: 0.4em 0.6em;
+  border-inline-start: 2px solid var(--color-border-highlight, #a98b62);
+}
+.swade-hud-test-note p {
+  margin: 0.2em 0 0;
+}
+
+.swade-hud-weapon-summary {
+  margin-block: 0.25em;
+}
+.swade-hud-weapon-summary button {
+  margin-top: 0.25em;
 }
 
 .application.swade-hud-popup {

@@ -1,0 +1,8 @@
+{
+  "_id": "swadehudhealing0",
+  "name": "Natural Healing",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/heal.svg",
+  "command": "return game.modules.get(\"swade-hud\").api.runExtra(\"natural-healing\", actor ?? undefined, token?.document);"
+}

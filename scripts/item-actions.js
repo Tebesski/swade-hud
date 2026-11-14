@@ -1,5 +1,6 @@
 import { powerTemplates, placePowerTemplate, isBoostLowerTrait, powerCostPresentation } from "./powers.js";
 import { ATTRIBUTES, localize, useItem } from "./swade.js";
+import { isOpposedAction } from "./basic-actions.js";
 
 // Include the base trait action as well as the item's configured alternatives.
 export function itemShortcutActions(actor, item) {
@@ -19,8 +20,8 @@ export function itemShortcutActions(actor, item) {
     result.push({ key: "formula", label: item.name + " (" + traitLabel(actions.trait) + ")", icon: "fa-dice" });
   }
   for (const [key, action] of Object.entries(actions.additional ?? {})) {
-    if (!action || !["trait", "resist", "damage", "macro"].includes(action.type)) continue;
-    const trait = ["trait", "resist"].includes(action.type) ? traitLabel(action.override || actions.trait) : "";
+    if (!action || !["trait", "damage", "macro"].includes(action.type) || isOpposedAction(action)) continue;
+    const trait = action.type === "trait" ? traitLabel(action.override || actions.trait) : "";
     result.push({ key, label: (action.name || key) + (trait ? " (" + trait + ")" : ""),
       icon: action.type === "damage" ? "fa-burst" : "fa-play" });
   }

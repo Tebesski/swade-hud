@@ -65,6 +65,10 @@ http.createServer((req, res) => {
   if (/^\/(ui|css|fonts|icons)\//.test(pathname)) { base = core; relative = pathname.slice(1); }
   if (pathname.startsWith("/modules/swade-tools/")) { base = path.resolve(workspace, "../swade-tools"); relative = pathname.slice("/modules/swade-tools/".length); }
   if (pathname.startsWith("/modules/swade-better-templates/")) { base = path.resolve(workspace, "../swade-better-templates"); relative = pathname.slice("/modules/swade-better-templates/".length); }
+  if (/^\/(?:modules\/)?swade-better-setting\//.test(pathname)) {
+    base = path.resolve(workspace, "../swade-better-setting");
+    relative = pathname.replace(/^\/(?:modules\/)?swade-better-setting\//, "");
+  }
   if (pathname.startsWith("/systems/swade/")) { base = path.resolve(workspace, "../../systems/swade"); relative = pathname.slice("/systems/swade/".length); }
   const target = path.resolve(base, relative.replace(/^\/+/, ""));
   if (!target.startsWith(path.resolve(base) + path.sep)) { res.writeHead(403); return res.end(); }

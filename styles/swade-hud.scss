@@ -62,7 +62,7 @@
     [menu-end portrait-start] var(--columns-portrait)
     [portrait-end info-start info-end statistics-start] auto
     [statistics-end resources-start] var(--column-1fr)
-    [resources-end sidebars-start] 10.434em
+    [resources-end sidebars-start] 12.1em
     [sidebars-end stretch-start] auto
     [stretch-end full-end];
   [data-panel="stats"] {
@@ -121,15 +121,13 @@
   .item-list { width: max-content; }
   .image { flex: 0 0 auto; overflow: hidden; }
   .image img { display: block; width: 100%; height: 100%; object-fit: cover; }
-  .item .attribute-image {
-    display: grid;
-    place-items: center;
-    flex: 0 0 var(--action-image-height);
-    width: var(--action-image-height);
-    i { position: static; width: auto; font-size: 1.25em; line-height: 1; }
+  .item.attack .weapon-heading {
+    width: 100%;
+    padding: 0.15em 0.35em;
+    gap: 0.35em;
+    .image { height: var(--action-image-height); margin: 0; }
+    > a:not(.image) { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
   }
-  .item.attack .name img { width: var(--action-image-height); }
-  .item.attack .name { width: 100%; }
   .item.attack .variants { width: 100%; }
   .item.action .name, .item.feat .name { white-space: nowrap; }
   .item .details { min-width: 0; }
@@ -138,11 +136,70 @@
   .empty { color: var(--color-darker); margin: 0.4em; }
   .skill-die { color: var(--color-accent); margin-right: 0.3em; }
   .attribute-name { color: var(--color-darker); font-size: 0.9em; }
+  [data-action="generate-actions"] { display: flex; gap: 0.4em; align-items: center; padding: 0.35em; }
+  .action-star.starred { color: #eac574; }
+  .skill-section { margin-bottom: 0.45em; }
+  .item.skill-heading {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.25em;
+    margin: 0;
+    padding: 0.2em;
+    background: var(--header-background);
+    font: 700 1em var(--sans-serif);
+    text-align: left;
+    .image { margin: 0; }
+    .name { min-width: 0; text-align: left; }
+    .name a { display: flex; align-items: baseline; gap: 0.3em; }
+    .skill-title { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+    .skill-die { margin: 0; white-space: nowrap; }
+    .attribute-name { flex-shrink: 0; margin-left: auto; }
+  }
+  .skill-actions-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 1.6em;
+    padding: 0.15em 0.4em;
+    border-bottom: var(--header-border);
+    background: var(--variant-background);
+    color: var(--color-darker);
+    &[aria-expanded="true"] i { rotate: 90deg; }
+    &:hover, &:focus-visible { color: var(--color); }
+    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+  }
+  .skill-actions { border-inline-start: var(--header-border); }
+  .skill-actions[hidden] { display: none; }
+  .skill-common { display: flex; flex-wrap: wrap; gap: 0.35em; padding: 0.3em; border-bottom: var(--header-border); }
+  .skill-common a { padding: 0.12em 0.25em; background: var(--variant-background); }
+  .item.trait-action-row {
+    gap: 0.3em;
+    margin: 0;
+    padding: 0.3em;
+    border-bottom: var(--header-border);
+    > [data-action="choose-action"] { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+    .action-star { flex: none; }
+  }
+  &[data-type="actions"] .item-list > :is(header, .hud-attack-options, [data-action="generate-actions"]) { column-span: all; }
+  &[data-type="items"] .item-list > header { break-after: avoid-column; }
+  &[data-type="items"] .item .name { white-space: normal; overflow-wrap: anywhere; }
   .power-pool { display: inline-flex; align-items: center; gap: 0.15em; }
   .power-pool input { width: 2em; }
   .power-pool a { font-size: 0.6em; }
   .no-macro { min-width: var(--min-width); }
   [data-panel="filter"] input { width: 100%; }
+  &[data-type="utilities"] .row > a {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.25em 0.35em;
+    border-radius: 2px;
+    &[aria-pressed="true"] {
+      background: var(--variant-background-selected);
+      color: var(--variant-color-selected);
+      box-shadow: var(--variant-box-shadow-selected);
+    }
+  }
   &[data-type="spells"] {
     .power-row .details { grid-template-rows: auto auto; min-width: 0; }
     .power-row .extras { gap: 0.3em; align-items: center; min-width: 0; }
@@ -212,6 +269,26 @@
     }
     a:focus-visible { outline: 1px solid var(--color-active); outline-offset: -1px; }
   }
+}
+.hud-attack-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2em 0.65em;
+  margin-bottom: 0.35em;
+  break-inside: avoid;
+  label { display: inline-flex; align-items: center; gap: 0.25em; cursor: pointer; }
+  input[type="checkbox"] { flex: 0 0 auto; margin: 0; }
+}
+
+.swade-hud-test-note {
+  margin-block: 0.4em;
+  padding: 0.4em 0.6em;
+  border-inline-start: 2px solid var(--color-border-highlight, #a98b62);
+  p { margin: 0.2em 0 0; }
+}
+.swade-hud-weapon-summary {
+  margin-block: 0.25em;
+  button { margin-top: 0.25em; }
 }
 .application.swade-hud-popup {
   --space-6: 0.375rem;

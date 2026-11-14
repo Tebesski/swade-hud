@@ -1,6 +1,7 @@
 import { rollAttribute, rollSkill, useItem, localize, swadeToolsDialogsDisabled } from "./swade.js";
 import { installToolsPowerCast } from "./power-chat.js";
 import { importSwadeTools } from "./tools-imports.js";
+import { guardToolsAttackTargets } from "./tools-chat.js";
 
 const wrapped = new WeakMap();
 
@@ -53,6 +54,8 @@ export function wrapToolsDialogClasses(SystemRoll, ItemDialog) {
 
 export async function installToolsDialogOverride() {
   if (!game.modules?.get("swade-tools")?.active) return;
-  const [{ default: SystemRoll }, { default: ItemDialog }] = await importSwadeTools("scripts/class/SystemRoll.js", "scripts/class/ItemDialog.js");
+  const [{ default: SystemRoll }, { default: ItemDialog }, { default: RollControl }] = await importSwadeTools(
+    "scripts/class/SystemRoll.js", "scripts/class/ItemDialog.js", "scripts/class/RollControl.js");
   wrapToolsDialogClasses(SystemRoll, ItemDialog);
+  guardToolsAttackTargets(RollControl);
 }

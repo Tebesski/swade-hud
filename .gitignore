@@ -1,2 +1,5 @@
 node_modules/
 dev/screenshots/
+packs/extras/LOCK
+packs/extras/LOG*
+packs/extras/*.log

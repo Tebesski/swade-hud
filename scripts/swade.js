@@ -3,6 +3,10 @@ import { withToolsForecast } from "./tools-forecast.js";
 import { bennyPool } from "./bennies.js";
 import { powerUsesNoPP } from "./powers.js";
 import { withPowerCastCard, withToolsPowerCast } from "./power-chat.js";
+import { actionKind, actionTarget, basicActionEdges, resolveBasicAction, runChaseAction, withActionEdges } from "./basic-actions.js";
+import { mountedSkill, rollMountedAttack, weaponModifiers, weaponOptionsForRoll, weaponRollKind, withWeaponRoll } from "./attack-options.js";
+import { rollSupport } from "./support.js";
+import { isGrapple } from "./grapple-chat.js";
 export const MODULE_ID = "swade-hud";
 export const SWADE_TOOLS_SETTING = "disableSwadeToolsDialogs";
 export const SWADE_TOOLS_GLOBAL_SETTING = "disableSwadeToolsDialogsGlobally";
@@ -19,7 +23,8 @@ export const SIDEBARS = [
   ["spells", "Powers", "fa-wand-magic-sparkles"],
   ["skills", "Skills", "fa-hand"],
   ["feats", "Edges & Hindrances", "fa-medal"],
-  ["extras", "Effects", "fa-cubes"],
+  ["extras", "Effects", "fa-sparkle"],
+  ["utilities", "Extras", "fa-cubes"],
 ];
 export const PHYSICAL = ["weapon", "armor", "shield", "gear", "consumable"];
 export const localize = (key, fallback = key) => {
@@ -55,7 +60,7 @@ function swadeTools() {
   return game.modules?.get("swade-tools")?.active ? game.swadetools : undefined;
 }
 export function hasSwadeToolsItemDialog(item) {
-  if (!swadeToolsEnabled() || !item) return false;
+  if (!swadeToolsEnabled() || !item || isGrapple(item)) return false;
   return (["weapon", "power"].includes(item.type) && typeof game.swadetools?.item === "function")
     || Boolean(item.system?.actions && typeof game.swade?.swadetoolsAttack === "function");
 }
@@ -121,12 +126,20 @@ export function recoverShaken(actor) {
   return recovery;
 }
 
-export async function useItem(actor, item, action = "formula", event, { castCard = false, nativeOnly = false, additionalMods = [] } = {}) {
+export async function useItem(actor, item, action = "formula", event, {
+  castCard = false, nativeOnly = false, additionalMods = [], inheritedWeaponOptions,
+} = {}) {
   if (!actor?.isOwner || !item) return;
   const additionalAction = item.system.actions?.additional?.[action];
   const isRoll = action === "formula" || action === "damage" || ["trait", "damage"].includes(additionalAction?.type);
   const powerCast = castCard && item.type === "power" && action === "formula";
-  if (!nativeOnly && hasSwadeToolsItemDialog(item) && isRoll) {
+  const basicAction = actionKind(item);
+  if (action === "formula" && ["chase-evade", "chase-steady"].includes(basicAction)) return runChaseAction(actor, item);
+  const weaponKind = weaponRollKind(item, action);
+  const modes = weaponKind && (event || inheritedWeaponOptions)
+    ? weaponOptionsForRoll(actor, item, action, inheritedWeaponOptions) : {};
+  const hasOptions = Object.entries(modes).some(([key, value]) => value && !["twoHanded", "flatBlade"].includes(key));
+  if (!nativeOnly && !basicAction && !hasOptions && hasSwadeToolsItemDialog(item) && isRoll) {
     // This opens Tools' complete item dialog; it owns the eventual roll and
     // resource expenditure. An undefined result is not a request to roll again.
     // Keep the original vehicle actor: Tools resolves its driver internally.
@@ -137,14 +150,24 @@ export async function useItem(actor, item, action = "formula", event, { castCard
     roller = (item.type === "weapon" ? actor.system.getCrewMemberForWeapon?.(item) : null)
       ?? actor.system.operator ?? actor;
   }
+  if (weaponKind) additionalMods.push(...weaponModifiers(roller, modes, weaponKind));
   if (item.type === "power" && powerUsesNoPP(item, actor) && !game.modules?.get?.("swade-better-powers")?.active && !game.modules?.get?.("swade-better-setting")?.api?.openPowers && action === "formula") {
     const cost = item.system.ppModifiers?.cost ?? item.system.pp ?? 0;
     additionalMods.push({ label: localize("TYPES.Item.power", "Power"), value: -Math.ceil(cost / 2) });
   }
-  const execute = () => game.swade.itemChatCardHelper.handleAction(item, roller, action, { additionalMods, event });
+  const mounted = weaponKind === "attack" && modes.mounted ? mountedSkill(roller, item, action) : undefined;
+  const execute = () => mounted ? rollMountedAttack(roller, item, action, mounted.skill, additionalMods)
+    : game.swade.itemChatCardHelper.handleAction(item, roller, action, { additionalMods, event });
   const roll = () => isRoll
     ? withToolsChatCard({ actor: roller, owner: actor, item, action, mods: additionalMods }, execute) : execute();
-  return powerCast ? withPowerCastCard(item, additionalMods, roll) : roll();
+  if (powerCast) return withPowerCastCard(item, additionalMods, roll);
+  if (weaponKind && hasOptions) return withWeaponRoll(roller, item, weaponKind, modes, additionalMods, roll);
+  if (!basicAction) return roll();
+  const target = actionTarget();
+  if (basicAction === "support" && action === "formula") return rollSupport(target, roll);
+  const result = await withActionEdges(roller, additionalMods, basicActionEdges(roller, item), roll);
+  await resolveBasicAction(actor, item, result, target);
+  return result;
 }
 export async function adjustResource(actor, key, delta) {
   if (!actor.isOwner) return;

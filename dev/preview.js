@@ -70,7 +70,8 @@ globalThis.game = {
       clientSettings.set(key,value);record("setting",namespace,key,value);
     },
   },
-  user: { id: "preview", getFlag: (_, key) => flags[key], setFlag: async (_, key, value) => { flags[key] = value; hud.schedule(); } },
+  user: { id: "preview", getFlag: (_, key) => flags[key], setFlag: async (_, key, value) => { flags[key] = value; hud.schedule(); },
+    update: async (changes) => update({flags: {[MODULE_ID]: flags}}, changes) },
   swade: {
     itemChatCardHelper: { handleAction: async (item, actor, action, options) => {
       const damage=action==="damage" || item.system.actions?.additional?.[action]?.type==="damage";
@@ -116,17 +117,27 @@ class FixtureApplication {
   setPosition(position) { for (const [key,value] of Object.entries(position)) this.element.style[key] = value + "px"; }
 }
 globalThis.foundry = { utils: { deepClone: (value) => structuredClone(value),
+    escapeHTML: value => String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll('"',"&quot;"),
     getType: (value) => value instanceof HTMLElement ? "HTMLElement" : typeof value,
     isSubclass: (Class, Base) => Class === Base || Class.prototype instanceof Base,
     getDefiningClass: (Class) => ContextMenu },
   applications: {
     detached: document.body,
     ux: { ContextMenu, TextEditor: { implementation: { enrichHTML: async (html) => html } } },
-    api: { ApplicationV2: FixtureApplication, DialogV2: { wait: async (config) => {
+    api: { ApplicationV2: FixtureApplication, DialogV2: {
+      prompt: (config) => new Promise((resolve, reject) => {
+        foundry.applications.api.DialogV2.wait({
+          ...config, close: () => resolve(null),
+          buttons: [{...config.ok, action: "ok", callback: (event, button, dialog) => resolve(config.ok.callback(event, button, dialog))}]
+        }).catch(reject);
+      }),
+      wait: async (config) => {
       record("dialog", config.window.title);
+      let resolve;
+      const result = new Promise(done => { resolve = done; });
       const dialog = new FixtureApplication(config);
       const close = dialog.close.bind(dialog);
-      dialog.close = () => { close(); config.close?.(null, dialog); };
+      dialog.close = () => { close(); resolve(config.close?.(null, dialog) ?? null); };
       await dialog.render();
       dialog.element.classList.add(...(config.classes ?? []));
       const form = document.createElement("form");
@@ -140,13 +151,16 @@ globalThis.foundry = { utils: { deepClone: (value) => structuredClone(value),
         button.className = option.class;
         button.dataset.action = option.action;
         button.textContent = option.label;
-        button.onclick = async (event) => { await option.callback(event, button, dialog); dialog.close(); };
+        button.onclick = async (event) => {
+          resolve(option.callback ? await option.callback(event, button, dialog) : option.action);
+          dialog.close();
+        };
         footer.append(button);
       }
       form.append(footer);
       dialog.element.querySelector(".window-content").append(form);
       config.render?.(null, dialog);
-      return dialog;
+      return result;
     } } },
   } };
 globalThis.CONST = { TOKEN_DISPOSITIONS: { FRIENDLY:1, NEUTRAL:0, HOSTILE:-1 } };
@@ -377,6 +391,10 @@ const tick = () => new Promise((resolve) => requestAnimationFrame(() => requestA
 const context = (element, shiftKey = false) => element.dispatchEvent(new MouseEvent("contextmenu", {
   bubbles: true, cancelable: true, shiftKey,
 }));
+const canvasClick = (position = {}) => {
+  const board = document.querySelector("#board");
+  for (const type of ["pointerdown", "pointerup"]) board.dispatchEvent(new PointerEvent(type, {bubbles: true, ...position}));
+};
 const chooseEffectContextAction = (label) => {
   const entry = [...document.querySelectorAll("#context-menu.swade-hud-effect-context .context-item")]
     .find((entry) => entry.textContent.trim() === label);
@@ -482,7 +500,7 @@ document.querySelector("#checks").onclick = async (event) => {
     assert("Popup Apply Effect delegates the configured native action", calls.some((call)=>call.method==="itemAction" && call.args[0]==="power3" && call.args[2]==="apply"));
     document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     assert("Clicks outside the canvas keep the compact action popup open", hud.description?.element.isConnected);
-    document.querySelector("#board").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
+    canvasClick();
     assert("Canvas clicks close the compact action popup", !hud.description && !document.querySelector(".swade-hud-shortcut-popup"));
     hud.closeDescription();
     hud.element.querySelector('[data-action=toggle-clean]').click();
@@ -491,7 +509,38 @@ document.querySelector("#checks").onclick = async (event) => {
       && hud.element.classList.contains("cleaned"));
     hud.element.querySelector('[data-action=toggle-clean]').click();
     await tick();
-    assert("Six icon sidebar controls", hud.element.querySelectorAll("[data-sidebar]").length === 6);
+    assert("Seven icon sidebar controls, with Extras after Effects", hud.element.querySelectorAll("[data-sidebar]").length === 7
+      && hud.element.querySelector('[data-sidebar=extras]').nextElementSibling?.dataset.sidebar === "utilities");
+    const previousGM = game.user.isGM;
+    game.user.isGM = true;
+    const combatant = {actor, tokenId: token.document.id, isOwner: true, roundHeld: null,
+      toggleHold() { this.roundHeld = game.combat.round; record("toggleHold"); },
+      actNow() { this.roundHeld = null; game.combat.combatant = this; record("actNow"); },
+      actAfterCurrentCombatant() { this.roundHeld = null; record("actAfterCurrentCombatant"); }};
+    const otherCombatant = {actor, tokenId: "other-token", isOwner: true};
+    game.combat = {started: true, round: 2, combatant, combatants: [combatant, otherCombatant]};
+    hud.element.querySelector('[data-sidebar=utilities]').click();
+    const hold = () => hud.sidebar.querySelector('[data-extra=hold]');
+    hold().click();
+    await tick();
+    assert("Extras Hold delegates to the current SWADE combatant", combatant.roundHeld === 2 && calls.at(-1).method === "toggleHold");
+    game.combat.combatant = otherCombatant;
+    hud.render();
+    assert("Extras highlights Hold while another token acts", hold().getAttribute("aria-pressed") === "true"
+      && getComputedStyle(hold()).backgroundColor !== "rgba(0, 0, 0, 0)");
+    hold().click();
+    await tick();
+    assert("Left-clicking while on Hold uses SWADE Act Now", combatant.roundHeld === null && calls.at(-1).method === "actNow");
+    hold().click();
+    await tick();
+    game.combat.combatant = otherCombatant;
+    context(hold());
+    await tick();
+    assert("Right-clicking while on Hold queues the combatant after the current turn", combatant.roundHeld === null
+      && game.combat.combatant === otherCombatant && calls.at(-1).method === "actAfterCurrentCombatant");
+    game.user.isGM = previousGM;
+    delete game.combat;
+    hud.closeSidebar();
     assert("Native hotbar integrated", hotbar.parentElement === hud.element);
     assert("Scene control buttons keep their original position and size", controlBounds().join()===controlsBeforeHud);
     assert("Left dock does not participate in scene-control layout", hud.element.parentElement.id==="interface");
@@ -835,20 +884,8 @@ document.querySelector("#checks").onclick = async (event) => {
     await tick();
     assert("Only the owned Unskilled Attempt remains", hud.sidebar.querySelectorAll('.item[data-item-id=unskilled]').length === 1
       && !hud.sidebar.querySelector('[data-action=unskilled]'));
-    const attributeImage = hud.sidebar.querySelector(".attribute-image");
-    const attributeIcon = attributeImage.querySelector("i");
-    const imageBounds = attributeImage.getBoundingClientRect();
-    const iconBounds = attributeIcon.getBoundingClientRect();
-    assert("Attribute icons are centered and sized", Math.abs(imageBounds.left+imageBounds.width/2-iconBounds.left-iconBounds.width/2)<2
-      && Math.abs(imageBounds.top+imageBounds.height/2-iconBounds.top-iconBounds.height/2)<2 && iconBounds.height>16);
-    attributeIcon.click();
-    await tick();
-    assert("Attribute icon LMB rolls the attribute", calls.at(-1).method==="attribute" && calls.at(-1).args[0]==="agility");
-    context(attributeImage);
-    await tick();
-    assert("Attribute image RMB opens modifier dialog", Boolean(document.querySelector(".swade-hud-stat-modifier")));
-    document.querySelector(".swade-hud-stat-modifier [data-action=boost]").click();
-    await tick();
+    assert("The Skills panel has no standalone Attributes section", !hud.sidebar.querySelector('[data-action="attribute"]')
+      && ![...hud.sidebar.querySelectorAll("header")].some(header => header.textContent === "Attributes"));
     const skillRow = hud.sidebar.querySelector('[data-modifier=skill][data-item-id=skill0]');
     context(skillRow);
     await tick();
@@ -904,25 +941,80 @@ document.querySelector("#checks").onclick = async (event) => {
     await tick();
     assert("Inventory context Delete opens native confirmation for the selected item",
       calls.at(-1).method === "deleteDialog" && calls.at(-1).args[0] === "rope" && hud.activeSidebar === "items");
-    hud.sidebar.querySelector('[data-action=item-description]').click();
+    const rope = hud.sidebar.querySelector('[data-item-id=rope]');
+    const ropeChats = calls.filter(call => call.method === "itemChat" && call.args[0] === "rope").length;
+    rope.querySelector(".image").click();
     await tick();
-    assert("Description windows preserve panel", Boolean(hud.description?.element?.isConnected) && hud.activeSidebar==="items");
+    assert("Clicking an item icon opens its description and preserves the panel", Boolean(hud.description?.element?.isConnected) && hud.activeSidebar==="items"
+      && calls.filter(call => call.method === "itemChat" && call.args[0] === "rope").length === ropeChats);
+    for (const control of rope.querySelectorAll("[data-item-chat-gesture]")) {
+      control.dispatchEvent(new MouseEvent("click", {bubbles: true, shiftKey: true}));
+    }
+    assert("Shift-clicking the icon or name posts the item", calls.filter(call => call.method === "itemChat" && call.args[0] === "rope").length === ropeChats + 2);
     document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     document.querySelector('[data-tab=chat]').dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     document.querySelector("#scene-controls button").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     assert("Body sidebar and scene-control clicks preserve HUD panels and item popups", hud.sidebar?.isConnected && hud.description?.element.isConnected);
-    document.querySelector("#board").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
+    const board = document.querySelector("#board");
+    board.dispatchEvent(new PointerEvent("pointerdown", {bubbles:true, button:2, clientX:80}));
+    board.dispatchEvent(new PointerEvent("pointermove", {bubbles:true, buttons:2, clientX:120}));
+    board.dispatchEvent(new PointerEvent("pointerup", {bubbles:true, button:2, clientX:120}));
+    assert("Dragging the canvas preserves both the sidebar and item popup", hud.sidebar?.isConnected && hud.description?.element.isConnected);
+    canvasClick();
     assert("Canvas clicks close both sidebar and item popup", !hud.sidebar && !hud.description);
     hud.element.querySelector('[data-sidebar=skills]').click();
     await tick();
-    context(hud.sidebar.querySelector(".attribute-image"));
+    const skillSection = name => [...hud.sidebar.querySelectorAll(".skill-section")]
+      .find(section => section.querySelector(".skill-title")?.textContent === name);
+    const intimidation = skillSection("Intimidation");
+    assert("Skills show their own actions with plain Support, Test, and Earn controls", intimidation?.textContent.includes("Battle Cry")
+      && [...intimidation.querySelectorAll(".skill-common a")].map(control => control.textContent).join(",") === "Support,Test,Earn"
+      && !intimidation.querySelector(".skill-common i"));
+    assert("Skill headings show the name before the die", intimidation.querySelector(".skill-title")?.nextElementSibling.classList.contains("skill-die"));
+    const skillToggle = intimidation.querySelector(".skill-actions-toggle");
+    const skillActions = intimidation.querySelector(".skill-actions");
+    assert("The Actions toggle is on its own row below the skill header", skillToggle.textContent === "Actions"
+      && skillToggle.previousElementSibling.classList.contains("skill-heading") && skillToggle.nextElementSibling === skillActions);
+    assert("Skill actions are collapsed by default", skillActions.hidden && skillToggle.getAttribute("aria-expanded") === "false"
+      && skillToggle.getAttribute("aria-controls") === skillActions.id);
+    skillToggle.dispatchEvent(new KeyboardEvent("keydown", {bubbles: true, key: "Enter"}));
+    assert("Keyboard expansion reveals only that skill's actions", !skillActions.hidden
+      && skillToggle.getAttribute("aria-expanded") === "true" && skillSection("Athletics").querySelector(".skill-actions").hidden);
+    const actionRow = skillSection("Intimidation").querySelector(".trait-action-row");
+    actionRow.querySelector(".image").click();
+    await tick();
+    assert("Clicking a skill action icon opens the action description", hud.description?.element.textContent.includes("Battle Cry description")
+      && !document.querySelector(".swade-hud-action-choices"));
+    hud.closeDescription();
+    skillSection("Intimidation").querySelector('[data-action=choose-action]').click();
+    await tick();
+    const actionChoices = document.querySelector(".swade-hud-action-choices");
+    assert("Multi-option skill actions open a dialog", actionChoices?.querySelector('[data-action=formula]') && actionChoices.querySelector('[data-action=test]'));
+    actionChoices.querySelector('[data-action=test]').click();
+    await tick();
+    assert("Choosing a skill action runs that variant", calls.at(-1).method === "itemAction" && calls.at(-1).args[2] === "test");
+    await hud.skillExpansionWrite;
+    hud.render();
+    const updatedSkill = skillSection("Intimidation");
+    const intimidationId = updatedSkill.querySelector(".skill-heading").dataset.itemId;
+    assert("The expanded skill is saved to the actor's HUD profile", flags.profiles[hud.profileKey].expandedSkills.includes(intimidationId)
+      && !updatedSkill.querySelector(".skill-actions").hidden);
+    updatedSkill.querySelector(".skill-actions-toggle").click();
+    await hud.skillExpansionWrite;
+    await tick();
+    hud.filterSidebar("Battle Cry");
+    assert("Filtering reveals a collapsed skill's action without changing its saved state", !skillSection("Intimidation").hidden
+      && !skillSection("Intimidation").querySelector(".skill-actions").hidden && !flags.profiles[hud.profileKey].expandedSkills.includes(intimidationId));
+    hud.filterSidebar("");
+    assert("Clearing the filter restores the collapsed skill", skillSection("Intimidation").querySelector(".skill-actions").hidden);
+    context(hud.sidebar.querySelector(".attribute-name"));
     await tick();
     const retainedDialog=document.querySelector(".swade-hud-stat-modifier");
     retainedDialog.querySelector("input").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     const dialogCanvas=document.createElement("canvas");retainedDialog.append(dialogCanvas);
     dialogCanvas.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     assert("Dialog clicks including their own canvases keep HUD panels open", hud.sidebar?.isConnected && retainedDialog.isConnected);
-    document.querySelector("#board").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true,clientX:120,clientY:120}));
+    canvasClick({clientX:120, clientY:120});
     assert("Scene board clicks close HUD panels without closing Boost Lower dialogs", !hud.sidebar && retainedDialog.isConnected);
     retainedDialog.querySelector('[data-action=boost]').click();
     await tick();
@@ -947,7 +1039,7 @@ document.querySelector("#checks").onclick = async (event) => {
     assert("Effect tooltip actions support keyboard activation", calls.filter((call)=>call.method==="effectSheet" && call.args[0]==="blessing").length===2);
     document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
     assert("Non-canvas clicks also preserve effect tooltips", document.querySelector(".swade-hud-effect-info"));
-    document.querySelector("#board").dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));
+    canvasClick();
     assert("Canvas clicks also close effect tooltips", !document.querySelector(".swade-hud-effect-info"));
     hud.element.querySelector('.effect-item[data-item-id=blessing]').dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
     await tick();
@@ -1076,11 +1168,9 @@ document.querySelector("#checks").onclick = async (event) => {
       && calls.some((call)=>call.method==="toolsRun" && call.args[0]===actor));
     hud.element.querySelector('[data-sidebar=skills]').click();
     await tick();
-    hud.sidebar.querySelector('.attribute-image[data-attribute=smarts]').click();
     hud.sidebar.querySelector('[data-action=skill][data-item-id=skill0]').click();
     await tick();
-    assert("Skills panel uses SWADE Tools for attribute icons and skills", calls.some((call)=>call.method==="toolsAttribute" && call.args[1]==="smarts")
-      && calls.some((call)=>call.method==="toolsSkill" && call.args[1]==="skill0"));
+    assert("Skills panel uses SWADE Tools for skill rolls", calls.some((call)=>call.method==="toolsSkill" && call.args[1]==="skill0"));
     hud.element.querySelector('[data-slot="10"]').click();
     hud.element.querySelector('[data-slot="11"]').click();
     await tick();
@@ -1383,7 +1473,7 @@ document.querySelector('#effect-gesture-checks').onclick=async(event)=>{
     hud.closeDescription();context(system('distracted'),false);await tick();
     check('Plain RMB retains the native Edit Delete context menu',!!document.querySelector('#context-menu.swade-hud-effect-context')&&[...document.querySelectorAll('#context-menu .context-item')].map(el=>el.textContent.trim()).join()==='Edit,Delete');
     hud.closeSidebarContextMenu();click(system('prone'));await tick();
-    document.querySelector('#board').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));
+    canvasClick();
     check('Canvas dismissal leaves duration dialogs open',!!document.querySelector('.swade-hud-status-duration'));
     document.querySelector('.swade-hud-status-duration [data-action=cancel]').click();await tick();
     output.textContent=results.join('\n')+'\n'+results.length+' effect gesture checks passed';

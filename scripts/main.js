@@ -9,6 +9,11 @@ import { RollInsights } from "./roll-insights.js";
 import { installToolsDialogOverride } from "./tools-dialogs.js";
 import { decoratePowerCastMessage, renderPowerCastCard, trackPowerCastDialog } from "./power-chat.js";
 import { patchTargetedDamageDialog } from "./targeted-damage.js";
+import { decorateWeaponMessage, renderWeaponMessage } from "./attack-options.js";
+import { adjustChaseAttackModifiers, renderTestRaiseNote } from "./basic-actions.js";
+import { registerMountedStatus } from "./effects.js";
+import { consumeSupport, installToolsSupport, markSupportRoll, registerSupportQuery } from "./support.js";
+import { renderGrappleCard } from "./grapple-chat.js";
 
 const hud = new SwadeHUD();
 const distance = new DistanceOverlay(() => hud.resolveToken(), () => game.settings.get(MODULE_ID, "tokenDistance"));
@@ -19,7 +24,15 @@ Hooks.on("hoverToken", (token, hovered) => distance.hover(token, hovered));
 Hooks.on("canvasTearDown", () => distance.reset());
 Hooks.on("preCreateChatMessage", decorateToolsChatMessage);
 Hooks.on("preCreateChatMessage", decoratePowerCastMessage);
+Hooks.on("preCreateChatMessage", decorateWeaponMessage);
+Hooks.on("swadeCalculateDefaultAttackMods", adjustChaseAttackModifiers);
+Hooks.on("swadePreRollAttribute", (actor, attribute, roll) => markSupportRoll(actor, "attribute", attribute, roll));
+Hooks.on("swadePreRollSkill", (actor, skill, roll) => markSupportRoll(actor, "skill", skill.id, roll));
+Hooks.on("createChatMessage", (message, _options, userId) => consumeSupport(message, userId).catch(error => hud.report(error)));
 Hooks.on("renderChatMessageHTML", (message, html) => {
+  renderGrappleCard(message, html).catch(error => hud.report(error));
+  renderTestRaiseNote(message, html);
+  renderWeaponMessage(message, html, useItem);
   renderPowerCastCard(message, html, useItem).catch((error) => console.error("SWADE HUD | Power cast card", error));
 });
 Hooks.on("renderApplicationV2", (app, html) => {
@@ -37,11 +50,14 @@ Hooks.on("updateActiveEffect", (effect, _changed, _options, userId) => syncSizeE
 Hooks.on("deleteActiveEffect", (effect, _options, userId) => syncSizeEffect(effect, userId));
 Hooks.once("init", () => {
   registerSettings();
+  registerSupportQuery();
   game.modules.get(MODULE_ID).api = hud;
 });
+Hooks.once("setup", registerMountedStatus);
 Hooks.once("ready", async () => {
   await migrateSettings().catch((error) => hud.report(error));
   installToolsDialogOverride().catch((error) => hud.report(error));
+  installToolsSupport().catch((error) => hud.report(error));
   hud.render();
 });
 Hooks.on("updateSetting", setting => {
@@ -52,7 +68,7 @@ Hooks.on("controlToken", (token, controlled) => {
   hud.schedule();
 });
 for (const hook of ["canvasReady", "renderHotbar", "createToken", "deleteToken", "updateToken",
-  "updateWorldTime", "updateCombat", "deleteCombat"]) Hooks.on(hook, () => hud.schedule());
+  "updateWorldTime", "updateCombat", "deleteCombat", "updateCombatant", "deleteCombatant"]) Hooks.on(hook, () => hud.schedule());
 Hooks.on("canvasTearDown", () => { hud.forgetToken(); hud.hide(); });
 for (const hook of ["updateActor", "deleteActor",
   "createItem", "updateItem", "deleteItem", "createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {

@@ -1,0 +1,8 @@
+{
+  "_id": "swadehudhold0000",
+  "name": "Hold",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/card-hand.svg",
+  "command": "return game.modules.get(\"swade-hud\").api.runExtra(\"hold\", actor ?? undefined, token?.document);"
+}

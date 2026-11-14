@@ -80,6 +80,11 @@
     <div id="result">Ready</div>
   </aside>
   <script>window.addEventListener("error",event=>{document.querySelector("#result").textContent="ERROR: "+event.message;});</script>
-  <script type="module" src="/dev/preview.js"></script>
+  <script type="module">
+    import("/dev/preview.js").catch(error => {
+      document.querySelector("#result").textContent = "ERROR: " + error.message;
+      console.error(error);
+    });
+  </script>
 </body>
 </html>

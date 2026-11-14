@@ -1,0 +1,8 @@
+{
+  "_id": "swadehudbreath00",
+  "name": "Hold breath",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/clockwork.svg",
+  "command": "return game.modules.get(\"swade-hud\").api.runExtra(\"hold-breath\", actor ?? undefined, token?.document);"
+}

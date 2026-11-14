@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 import { MODULE_ID, SWADE_TOOLS_SETTING, SWADE_TOOLS_GLOBAL_SETTING, rollAttribute, rollSkill, rollRunning, useItem, hasSwadeToolsItemDialog, openSwadeToolsItemDialog } from "../scripts/swade.js";
 import { registerSettings, migrateSettings } from "../scripts/settings.js";
+import { setAttackOption } from "../scripts/attack-options.js";
 
 describe("optional SWADE Tools roll integration", () => {
   let calls, actor, weapon, power, action, modules;
@@ -18,7 +19,7 @@ describe("optional SWADE Tools roll integration", () => {
     const items = [weapon,power,action,{id:"skill",type:"skill",system:{swid:"athletics"}},
       {id:"unskilled",type:"skill",system:{swid:"unskilled-attempt"}}];
     items.get = (id) => items.find((item)=>item.id===id);
-    actor = { id:"actor", type:"character", isOwner:true, items, system:{},
+    actor = { id:"actor", type:"character", isOwner:true, items, system:{}, effects:[], statuses:new Set(),
       rollAttribute:named("native","attribute"), rollSkill:named("native","skill"),
       rollRunningDie:named("native","run") };
     modules = new Map([["swade-tools",{active:true}]]);
@@ -97,6 +98,20 @@ describe("optional SWADE Tools roll integration", () => {
     assert.equal(toolsCalls().length,2);
     assert.ok(toolsCalls().every((call)=>call.method==="item" && call.args[0]===actor && call.args[1]===weapon.id));
     assert.equal(nativeCalls().length,0);
+  });
+  it("passes HUD attack options directly to the native roll and preserves inherited damage options", async () => {
+    setAttackOption(actor, "wild", true);
+    const event = {};
+    await useItem(actor, weapon, "formula", event);
+    setAttackOption(actor, "desperate4", true);
+    await useItem(actor, weapon, "damage", event);
+    await useItem(actor, weapon, "damage", event, { inheritedWeaponOptions: {wild: true} });
+    assert.equal(toolsCalls().length, 0);
+    assert.deepEqual(nativeCalls().map(call => call.args[3].additionalMods), [
+      [{label: "Wild Attack", value: 2}],
+      [{label: "Desperate Attack", value: -4}],
+      [{label: "Wild Attack", value: 2}],
+    ]);
   });
   it("does not run vanilla rolls when a Tools dialog returns undefined or null", async () => {
     game.swadetools.item=()=>undefined;

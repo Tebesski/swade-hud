@@ -9,6 +9,9 @@ import { EffectPanels, actorEffects, confirmEffectDeletion, nonSystemEffects, ef
 import { dispositionDetails, showDispositionDialog } from "./disposition.js";
 import { powerTemplates, placePowerTemplate, isTemplateRange, isBoostLowerTrait, powerPoolUsesNoPP, powerCostPresentation } from "./powers.js";
 import { showModifierDialog } from "./modifiers.js";
+import { actionKind, actionUsesSkill, coreSkillDocument, generateBasicActions, isOpposedAction, rollCommonSkillAction, skillActions } from "./basic-actions.js";
+import { holdCombatant, naturalHealingCooldown, runExtra, EXTRAS } from "./extras.js";
+import { attackOptions, attackOptionState, setAttackOption } from "./attack-options.js";
 import { itemShortcutActions } from "./item-actions.js";
 import { bennyPool } from "./bennies.js";
 import { actorSize, adjustScale, applySizeChange, showSizeDialog, showSizeReference } from "./scale.js";
@@ -85,16 +88,39 @@ export class SwadeHUD {
   effectPanels = new EffectPanels((error) => this.report(error));
   lastOwnedTokenId = null;
   lastScene = null;
+  canvasPointer = null;
+  pendingSkillExpansion = new Map();
+  skillExpansionWrite = Promise.resolve();
+  filteredSkillExpansion = new Map();
 
   constructor() {
     document.addEventListener("keydown", (event) => this.onKey(event));
     document.addEventListener("pointerdown", (event) => this.onCanvasPointerDown(event), true);
+    document.addEventListener("pointermove", (event) => this.onCanvasPointerMove(event), true);
+    document.addEventListener("pointerup", (event) => this.onCanvasPointerUp(event), true);
+    document.addEventListener("pointercancel", (event) => {
+      if (event.pointerId === this.canvasPointer?.id) this.canvasPointer = null;
+    }, true);
   }
   onCanvasPointerDown(event) {
     // Token clicks use the same PIXI board. Dialogs and other Foundry UI can
     // contain their own canvases, so only the scene's board should dismiss us.
     const board = document.getElementById("board");
     if (!board || !event.composedPath().includes(board)) return;
+    this.canvasPointer = {id: event.pointerId, x: event.clientX, y: event.clientY, board};
+  }
+  onCanvasPointerMove(event) {
+    const pointer = this.canvasPointer;
+    if (pointer?.id === event.pointerId && Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 4) {
+      this.canvasPointer = null;
+    }
+  }
+  onCanvasPointerUp(event) {
+    this.onCanvasPointerMove(event);
+    const pointer = this.canvasPointer;
+    if (!pointer || pointer.id !== event.pointerId) return;
+    this.canvasPointer = null;
+    if (!event.composedPath().includes(pointer.board)) return;
     this.closeSidebar();
     this.closeDescription();
     this.hideTooltip();
@@ -439,6 +465,9 @@ export class SwadeHUD {
     const scroll = this.sidebar?.querySelector(".inner")?.scrollTop ?? 0;
     const search = this.sidebar?.querySelector("input[type=text]")?.value ?? "";
     const filterVisible = this.sidebar?.querySelector('[data-panel="filter"]')?.classList.contains("visible");
+    const focused = document.activeElement;
+    const focusedSkill = this.sidebar?.contains(focused) && focused.matches(".skill-actions-toggle")
+      ? focused.dataset.itemId : null;
     this.closeSidebarContextMenu();
     this.sidebar?.remove();
     const sidebar = node("div", "swade-hud-element");
@@ -455,6 +484,7 @@ export class SwadeHUD {
       case "skills": this.skillSidebar(list); break;
       case "feats": this.featureSidebar(list); break;
       case "extras": this.extrasSidebar(list); break;
+      case "utilities": this.utilitiesSidebar(list); break;
     }
     inner.append(list);
     sidebar.append(inner);
@@ -464,7 +494,10 @@ export class SwadeHUD {
     field.type = "text";
     field.placeholder = "Filter";
     field.value = search;
-    field.addEventListener("input", () => this.filterSidebar(field.value));
+    field.addEventListener("input", () => {
+      this.filteredSkillExpansion.clear();
+      this.filterSidebar(field.value);
+    });
     filter.append(field);
     document.body.append(sidebar);
     this.sidebar = sidebar;
@@ -475,6 +508,7 @@ export class SwadeHUD {
     this.positionSidebar();
     inner.scrollTop = scroll;
     if (search) this.filterSidebar(search);
+    if (focusedSkill) sidebar.querySelector(`#swade-hud-skill-toggle-${CSS.escape(focusedSkill)}`)?.focus({ preventScroll: true });
   }
   positionSidebar() {
     if (!this.sidebar || !this.element) return;
@@ -515,6 +549,7 @@ export class SwadeHUD {
     this.effectPanels.hideListTooltip();
     this.closeSidebarContextMenu();
     this.sidebarContextMenu = null;
+    this.filteredSkillExpansion.clear();
     this.sidebar?.remove();
     this.sidebar = null;
     this.activeSidebar = null;
@@ -530,22 +565,31 @@ export class SwadeHUD {
       el.hidden = Boolean(query) && !el.dataset.filterValue.includes(query);
     });
     const visibleEntry = el => [...el.querySelectorAll("[data-filter-value]")].some(entry => !entry.hidden);
-    this.sidebar.querySelectorAll(".effect-group,.effect-column").forEach(el => { el.hidden = Boolean(query) && !visibleEntry(el); });
+    this.sidebar.querySelectorAll(".effect-group,.effect-column,.skill-section").forEach(el => { el.hidden = Boolean(query) && !visibleEntry(el); });
+    for (const section of this.sidebar.querySelectorAll(".skill-section:not([hidden])")) {
+      const heading = section.querySelector(".skill-heading");
+      heading.hidden = false;
+      const actions = section.querySelector(".skill-actions");
+      if (!actions) continue;
+      const id = heading.dataset.itemId;
+      const expanded = this.isSkillExpanded(id) || (Boolean(query) && visibleEntry(actions));
+      this.setSkillActionsExpanded(section, this.filteredSkillExpansion.get(id) ?? expanded);
+    }
     this.sidebar.querySelectorAll("header").forEach(heading => {
       const members = [];
       for (let next = heading.nextElementSibling; next && next.tagName !== "HEADER"; next = next.nextElementSibling) {
         if (next.matches("[data-filter-value]")) members.push(next);
         members.push(...next.querySelectorAll("[data-filter-value]"));
       }
-      heading.hidden = Boolean(query) && !members.some(entry => !entry.hidden);
+      heading.hidden = Boolean(query) && !heading.closest(".skill-section") && !members.some(entry => !entry.hidden);
     });
     let empty = this.sidebar.querySelector(".search-empty");
     if (!empty) { empty = node("p", "empty search-empty", "No matches"); this.sidebar.querySelector(".item-list").append(empty); }
     empty.hidden = !query || [...entries].some(entry => !entry.hidden);
     this.positionSidebar();
   }
-  itemShell(parent, item, className = "") {
-    const row = node("div", "item " + className);
+  itemShell(parent, item, className = "", tag = "div") {
+    const row = node(tag, "item " + className);
     row.dataset.itemId = item.id;
     row.dataset.filterValue = item.name.toLocaleLowerCase();
     row.draggable = true;
@@ -553,18 +597,17 @@ export class SwadeHUD {
     return row;
   }
   itemImage(parent, item) {
-    const image = node("div", "image");
-    image.dataset.action = "item-chat";
-    image.title = "Send " + item.name + " to chat";
+    const image = link(parent, "item-description", "", "", "Read " + item.name + " · Shift-click to send to chat");
+    image.className = "image";
+    image.dataset.itemChatGesture = "";
     const img = node("img");
     img.src = item.img || "icons/svg/item-bag.svg";
     img.alt = "";
-    image.append(img, icon("fa-message", "chat"));
-    parent.append(image);
+    image.append(img, icon("fa-book-open", "chat"));
   }
   itemName(parent, item) {
     const name = node("div", "name");
-    link(name, "item-description", "", item.name, item.name);
+    link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat").dataset.itemChatGesture = "";
     parent.append(name);
     return name;
   }
@@ -575,7 +618,8 @@ export class SwadeHUD {
   }
   actionVariants(parent, item, { baseDamage = false } = {}) {
     const actions = Object.entries(item.system.actions?.additional ?? {})
-      .filter(([, action]) => !(isBoostLowerTrait(item) && (action.type === "resist" || /^resist$/i.test(action.name ?? ""))));
+      .filter(([, action]) => !(item.type === "weapon" && isOpposedAction(action))
+        && !(isBoostLowerTrait(item) && (action.type === "resist" || /^resist$/i.test(action.name ?? ""))));
     if (!actions.length && !(baseDamage && item.system.damage)) return;
     const variants = node("div", "variants controls");
     variants.dataset.itemId = item.id;
@@ -585,16 +629,29 @@ export class SwadeHUD {
     parent.append(variants);
   }
   actionSidebar(list) {
+    const toggles = node("div", "hud-attack-options");
+    for (const option of attackOptions(this.actor)) {
+      const label = node("label");
+      const field = node("input");
+      field.type = "checkbox";
+      field.checked = attackOptionState(this.actor, option.id);
+      label.title = option.help;
+      field.addEventListener("change", () => {
+        setAttackOption(this.actor, option.id, field.checked);
+        this.schedule();
+      });
+      label.append(field, node("span", "", option.label));
+      toggles.append(label);
+    }
+    list.append(toggles);
+    if (this.owned) link(list, "generate-actions", "fa-list-check", "Generate basic actions", "Generate basic actions");
     const weapons = sorted(itemsOf(this.actor, "weapon"));
     header(list, "Attacks");
     for (const item of weapons) {
       const row = this.itemShell(list, item, "attack ready");
-      const name = node("div", "name");
-      const image = node("img");
-      image.src = item.img;
-      image.alt = "";
-      name.append(image);
-      link(name, "item-description", "", item.name, item.name);
+      const name = node("div", "name weapon-heading");
+      this.itemImage(name, item);
+      link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat").dataset.itemChatGesture = "";
       row.append(name);
       const variants = node("div", "variants");
       variants.append(icon("fa-sword", "category"));
@@ -611,47 +668,64 @@ export class SwadeHUD {
       this.actionVariants(row, item);
     }
     if (!weapons.length) list.append(node("p", "empty", "No weapons"));
-    this.actionItems(list, itemsOf(this.actor, "action", "ability").filter((item) => !item.system.hidden), "Actions & Abilities");
+    this.actionItems(list, itemsOf(this.actor, "action", "ability")
+      .filter(item => !item.system.hidden && !actionUsesSkill(item)), "Actions & Abilities");
   }
   actionItems(list, items, title) {
     if (!items.length) return;
     header(list, title);
-    for (const item of sorted(items)) {
-      const row = this.itemShell(list, item, "action");
-      this.itemImage(row, item);
-      this.itemName(row, item);
-      const controls = node("div", "controls");
-      link(controls, item.system.actions?.trait ? "item-action" : "item-chat", "fa-play", "", "Use " + item.name,
-        { itemId: item.id, itemAction: "formula" });
-      row.append(controls);
-      this.actionVariants(list, item);
+    for (const item of this.favoriteActions(items)) {
+      this.actionRow(list, item);
     }
   }
-  skillSidebar(list) {
-    header(list, "Attributes");
-    for (const [key, label, glyph] of ATTRIBUTES) {
-      if (!this.actor.system.attributes?.[key]) continue;
-      const row = node("div", "item statistic proficient");
-      row.dataset.modifier = "attribute";
-      const image = link(row, "attribute", glyph, "", "Roll " + localize(label, key), { attribute: key });
-      image.className = "image attribute-image";
-      const name = node("div", "name");
-      link(name, "attribute", "", localize(label, key), localize(label, key), { attribute: key });
-      row.append(name, node("span", "skill-die", dieLabel(this.actor.system.attributes[key].die)));
-      row.draggable = true;
-      row.dataset.dragType = "attribute";
-      row.dataset.attribute = key;
-      list.append(row);
+  actionRow(parent, item) {
+    const row = this.itemShell(parent, item, "action trait-action-row");
+    this.itemImage(row, item);
+    const name = link(row, "choose-action", "", item.name, "Use " + item.name + " · Shift-click to send to chat");
+    name.dataset.itemChatGesture = "";
+    this.actionStar(row, item);
+    return row;
+  }
+  async chooseItemAction(item, event) {
+    const actor = this.actor;
+    const actions = itemShortcutActions(actor, item);
+    if (!actions.length && ["chase-evade", "chase-steady"].includes(actionKind(item))) {
+      return useItem(actor, item, "formula", event);
     }
-    header(list, "Skills");
+    if (!actions.length) return this.showDescription(item);
+    const choice = actions.length === 1 ? actions[0].key : await foundry.applications.api.DialogV2.wait({
+      window: {title: item.name}, classes: ["swade-hud-action-choices"], rejectClose: false,
+      buttons: actions.map(({key, label}) => ({action: key, label: foundry.utils.escapeHTML(label)})),
+    });
+    if (choice && this.actor === actor && actor.items.get(item.id) === item) {
+      return useItem(actor, item, choice, event, {nativeOnly: true});
+    }
+  }
+  favoriteActions(items) {
+    const favorites = new Set(this.profile.actionFavorites ?? []);
+    return sorted(items).sort((a, b) => Number(favorites.has(b.id)) - Number(favorites.has(a.id)));
+  }
+  actionStar(parent, item) {
+    const starred = this.profile.actionFavorites?.includes(item.id) ?? false;
+    const button = link(parent, "action-favorite", starred ? "fa-star" : "fa-star fa-regular", "",
+      (starred ? "Unstar " : "Star ") + item.name, { itemId: item.id });
+    const glyph = button.querySelector("i");
+    if (!starred) glyph.classList.remove("fa-solid");
+    button.className = "action-star" + (starred ? " starred" : "");
+    button.setAttribute("aria-pressed", String(starred));
+  }
+  skillSidebar(list) {
     for (const item of sorted(itemsOf(this.actor, "skill"))) {
-      const row = this.itemShell(list, item, "statistic proficient");
+      const section = node("section", "skill-section");
+      list.append(section);
+      const row = this.itemShell(section, item, "statistic proficient skill-heading", "h3");
       row.dataset.modifier = "skill";
       row.title = "Right-click: Edit / Delete · Shift+Right-click: temporary skill modifier";
       this.itemImage(row, item);
       const name = node("div", "name");
       const roll = link(name, "skill", "", "", "Roll " + item.name, { itemId: item.id });
-      roll.append(node("span", "skill-die", dieLabel(item.system.die, item.modifier)), document.createTextNode(item.name));
+      roll.dataset.itemChatGesture = "";
+      roll.append(node("span", "skill-title", item.name), node("span", "skill-die", dieLabel(item.system.die, item.modifier)));
       row.append(name);
       const attr = ATTRIBUTES.find(([key]) => key === item.system.attribute);
       if (attr) {
@@ -661,6 +735,89 @@ export class SwadeHUD {
         attribute.title = "Right-click for a temporary attribute modifier";
         row.append(attribute);
       }
+      if (["unskilled", "unskilled-attempt"].includes(item.system.swid)) continue;
+      const toggle = link(section, "toggle-skill-actions", "fa-chevron-right", "Actions", "Actions for " + item.name,
+        { itemId: item.id });
+      toggle.className = "skill-actions-toggle";
+      toggle.id = "swade-hud-skill-toggle-" + item.id;
+      toggle.setAttribute("aria-controls", "swade-hud-skill-actions-" + item.id);
+      const body = node("div", "skill-actions");
+      body.id = toggle.getAttribute("aria-controls");
+      section.append(body);
+      this.setSkillActionsExpanded(section, this.isSkillExpanded(item.id));
+      const actions = Map.groupBy(skillActions(this.actor, item), entry => entry.item);
+      const common = node("div", "skill-common");
+      common.dataset.filterValue = "support test earn " + item.name.toLocaleLowerCase();
+      for (const [kind, label] of [["support", "Support"], ["test", "Test"], ["earn", "Earn"]]) {
+        link(common, "skill-common", "", label, label + " with " + item.name, {itemId: item.id, kind});
+      }
+      body.append(common);
+      const entries = [...actions.keys()].filter(action => !["support", "test", "earn"].includes(actionKind(action)));
+      for (const action of this.favoriteActions(entries)) {
+        const actionRow = this.actionRow(body, action);
+        actionRow.dataset.filterValue += " " + item.name.toLocaleLowerCase()
+          + " " + actions.get(action).map(entry => entry.variant ?? "").join(" ").toLocaleLowerCase();
+      }
+    }
+  }
+  setSkillActionsExpanded(section, expanded) {
+    section.querySelector(".skill-actions").hidden = !expanded;
+    section.querySelector(".skill-actions-toggle").setAttribute("aria-expanded", String(expanded));
+  }
+  isSkillExpanded(skillId) {
+    return this.pendingSkillExpansion.get(this.profileKey)?.get(skillId)?.expanded
+      ?? this.profile.expandedSkills?.includes(skillId) ?? false;
+  }
+  toggleSkillActions(target, skillId) {
+    const section = target.closest(".skill-section");
+    const expanded = section.querySelector(".skill-actions").hidden;
+    const searching = Boolean(this.sidebar.querySelector('[data-panel="filter"] input').value.trim());
+    this.setSkillActionsExpanded(section, expanded);
+    this.positionSidebar();
+    if (searching) this.filteredSkillExpansion.set(skillId, expanded);
+    return this.saveSkillExpansion(skillId, expanded);
+  }
+  saveSkillExpansion(skillId, expanded) {
+    const profileKey = this.profileKey;
+    const pending = this.pendingSkillExpansion.get(profileKey) ?? new Map();
+    const change = { expanded };
+    pending.set(skillId, change);
+    this.pendingSkillExpansion.set(profileKey, pending);
+    const write = this.skillExpansionWrite.catch(() => {}).then(async () => {
+      try {
+        if (pending.get(skillId) !== change) return;
+        const openSkills = new Set(this.profiles[profileKey]?.expandedSkills ?? []);
+        if (expanded) openSkills.add(skillId);
+        else openSkills.delete(skillId);
+        await game.user.update({ [`flags.${MODULE_ID}.profiles.${profileKey}.expandedSkills`]: [...openSkills] });
+      } catch (error) {
+        this.schedule();
+        throw error;
+      } finally {
+        if (pending.get(skillId) === change) pending.delete(skillId);
+        if (!pending.size) this.pendingSkillExpansion.delete(profileKey);
+      }
+    });
+    this.skillExpansionWrite = write;
+    return write;
+  }
+  utilitiesSidebar(list) {
+    header(list, "Extras");
+    for (const [key, label, glyph] of EXTRAS) {
+      const row = node("div", "row");
+      row.dataset.filterValue = label.toLocaleLowerCase();
+      const control = link(row, "extra", glyph, label, label, {extra: key});
+      if (key === "natural-healing" && naturalHealingCooldown(this.actor)) {
+        control.classList.add("disabled");
+        control.setAttribute("aria-disabled", "true");
+        control.title = "Natural Healing is on cooldown";
+      }
+      if (key === "hold") {
+        const held = Boolean(holdCombatant(this.actor, this.token?.document)?.roundHeld);
+        control.setAttribute("aria-pressed", String(held));
+        control.title = held ? "Left-click: Act Now · Right-click: Act After Current Combatant" : "Hold on this combatant’s turn";
+      }
+      list.append(row);
     }
   }
   featureSidebar(list) {
@@ -789,7 +946,8 @@ export class SwadeHUD {
     const effects = nonSystemEffects(this.actor);
     const starred = effects.filter((effect) => favorites.has("effect:" + effect.uuid));
     const remaining = effects.filter((effect) => !favorites.has("effect:" + effect.uuid));
-    const temporary = (effect) => effect.isTemporary ?? Number.isFinite(effect.duration?.value);
+    const temporary = effect => Boolean(effect.flags?.[MODULE_ID]?.support)
+      || (effect.isTemporary ?? Number.isFinite(effect.duration?.value));
     for (const [label, entries] of [["Starred", starred], ["Temporary Effects", remaining.filter(temporary)],
       ["Permanent Effects", remaining.filter((effect) => !temporary(effect))]]) {
       if (!entries.length) continue;
@@ -969,7 +1127,13 @@ export class SwadeHUD {
       document.querySelector("#hotbar [data-action=" + ({ "hotbar-lock": "lock", "hotbar-mute": "mute", "hotbar-clear": "clear" }[action]) + "]")?.click();
       return this.schedule();
     }
-    if (action === "item-description") return this.showDescription(item);
+    if (event.shiftKey && "itemChatGesture" in data && item) return item.show();
+    if (action === "item-description") {
+      const actor = this.actor;
+      const document = item?.type === "skill" ? await coreSkillDocument(item) : item;
+      if (this.actor === actor) return this.showDescription(document);
+      return;
+    }
     if (action === "close-description") return this.closeDescription();
     if (action === "edit-item") return item?.sheet.render({ force: true });
     if (action === "effect-sheet") return this.actor.effects.get(data.effectId)?.sheet.render({ force: true });
@@ -977,6 +1141,18 @@ export class SwadeHUD {
     switch (action) {
       case "power-timers": return game.modules.get("swade-better-powers")?.api?.openPowerTimers?.(this.actor);
       case "item-chat": return item?.show();
+      case "generate-actions": await generateBasicActions(this.actor); return this.schedule();
+      case "action-favorite": {
+        if (!item) return;
+        const favorites = new Set(this.profile.actionFavorites ?? []);
+        if (favorites.has(item.id)) favorites.delete(item.id);
+        else favorites.add(item.id);
+        return this.saveProfile({ ...this.profile, actionFavorites: [...favorites] });
+      }
+      case "skill-common": return item && rollCommonSkillAction(this.actor, item, data.kind);
+      case "toggle-skill-actions": return item && this.toggleSkillActions(target, item.id);
+      case "choose-action": return item && this.chooseItemAction(item, event);
+      case "extra": return runExtra(this.actor, this.token?.document, data.extra);
       case "item-action": return useItem(this.actor, item, data.itemAction, event, { castCard: true });
       case "attribute": return rollAttribute(this.actor, data.attribute);
       case "skill": if (canRollSkills(this.actor) && item) return rollSkill(this.actor, item.id); break;
@@ -1050,6 +1226,11 @@ export class SwadeHUD {
       return this.changeShortcutPage(-1);
     }
     if (!this.owned) return;
+    if (event.target.closest('[data-action="extra"][data-extra="hold"]')) {
+      event.preventDefault();
+      event.stopPropagation();
+      return runExtra(this.actor, this.token?.document, "hold", {after: true}).catch(error => this.report(error));
+    }
     if (event.target.closest(".effect-row")) return; // Handled by the native context menu.
     const itemRow = event.target.closest(ITEM_CONTEXT_TARGET);
     if (itemRow && this.sidebar?.contains(itemRow)) {
@@ -1119,8 +1300,11 @@ export class SwadeHUD {
     if (doc.type === "skill") return rollSkill(this.actor, doc.id);
     if (doc.type === "consumable") return doc.consume();
     const actions = itemShortcutActions(this.actor, doc);
-    if (hasSwadeToolsItemDialog(doc) && (["weapon", "power"].includes(doc.type) || actions.length)) {
+    if (!actionKind(doc) && hasSwadeToolsItemDialog(doc) && (["weapon", "power"].includes(doc.type) || actions.length)) {
       this.closeDescription();
+      if (doc.type === "weapon" && attackOptions(this.actor).some(option => attackOptionState(this.actor, option.id))) {
+        return useItem(this.actor, doc, "formula", event);
+      }
       return openSwadeToolsItemDialog(this.actor, doc, { castCard: doc.type === "power" });
     }
     if (doc.type === "weapon" || doc.type === "power" || actions.length > 1) {
@@ -1133,6 +1317,9 @@ export class SwadeHUD {
     }
     if (actions.length === 1) return useItem(this.actor, doc, actions[0].key, event);
     return doc.show();
+  }
+  runExtra(key, actor = this.actor, token = actor === this.actor ? this.token?.document : actor?.token) {
+    return runExtra(actor, token, key);
   }
   changeScale(delta) {
     const actor = this.actor, token = this.token?.document;
@@ -1151,7 +1338,8 @@ export class SwadeHUD {
     return this.scaleUpdate;
   }
   async saveProfile(profile) {
-    await game.user.setFlag(MODULE_ID, "profiles", { ...this.profiles, [this.profileKey]: profile });
+    const { expandedSkills, ...data } = profile;
+    await game.user.update({ [`flags.${MODULE_ID}.profiles.${this.profileKey}`]: data });
     this.schedule();
   }
   async toggleAppearance(key) {

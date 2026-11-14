@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { withToolsChatCard, decorateToolsChatMessage } from "../scripts/tools-chat.js";
+import { withToolsChatCard, decorateToolsChatMessage, guardToolsAttackTargets } from "../scripts/tools-chat.js";
+import { grappleOutcome } from "../scripts/grapple-chat.js";
 
 describe("native SWADE dialogs with Tools chat automation",()=>{
   let listeners,actor,item,sequence;
@@ -16,7 +17,10 @@ describe("native SWADE dialogs with Tools chat automation",()=>{
     globalThis.game={modules:new Map([["swade-tools",{active:true}]]),user:{id:"user",targets:new Set([{id:"target"}])}};
   });
   function message(roll){
-    const result={rolls:[structuredClone(roll)],flags:{other:{retained:true}},updateSource(data){this.tools=data["flags.swade-tools"];}};
+    const result={rolls:[structuredClone(roll)],flags:{other:{retained:true}},updateSource(data){
+      if (data["flags.swade-tools"]) this.tools=data["flags.swade-tools"];
+      if (data["flags.swade-hud.grapple"]) this.grapple=data["flags.swade-hud.grapple"];
+    }};
     decorateToolsChatMessage(result,{}, {},"user");return result;
   }
   for(const [kind,hook] of [["skill","swadePreRollSkill"],["damage","swadeRollDamage"]]){
@@ -70,5 +74,58 @@ describe("native SWADE dialogs with Tools chat automation",()=>{
   it("does not decorate messages while Tools is inactive",async()=>{
     game.modules.get("swade-tools").active=false;
     await withToolsChatCard({actor,mods:[]},async()=>assert.equal(listeners.size,0));
+  });
+  it("routes Grapple's opposed roll to Grab and preserves Crush as damage", async () => {
+    const grapple = {id: "grapple", type: "action", system: {swid: "grapple"}};
+    const targetUuid = "Scene.scene.Token.target";
+    game.user.targets = new Set([{id: "target", document: {uuid: targetUuid}}]);
+    for (const tools of [true, false]) {
+      game.modules.get("swade-tools").active = tools;
+      const mods = [];
+      await withToolsChatCard({actor, item: grapple, action: "formula", mods}, async () => {
+        const roll = {terms: [{options: {}}]};
+        Hooks.call("swadePreRollSkill", actor, {name: "Athletics"}, roll, mods, {additionalMods: mods});
+        const chat = message(roll);
+        assert.deepEqual(chat.grapple, {targetUuid});
+        assert.equal(chat.tools?.itemroll, undefined);
+      });
+    }
+    game.modules.get("swade-tools").active = true;
+    const mods = [];
+    await withToolsChatCard({actor, item: grapple, action: "crush", mods}, async () => {
+      const roll = {terms: [{options: {}}]};
+      Hooks.call("swadeRollDamage", actor, grapple, roll, mods, {additionalMods: mods});
+      const chat = message(roll);
+      assert.equal(chat.grapple, undefined);
+      assert.equal(chat.tools.itemroll, grapple.id);
+      assert.equal(chat.tools.rolltype, "damage");
+    });
+  });
+  it("uses the opposed Athletics result to select Entangled or Bound", () => {
+    const grab = {total: 9};
+    assert.equal(grappleOutcome(grab, {total: 9}, new Set()), null);
+    assert.equal(grappleOutcome(grab, {total: 7}, new Set()), "entangled");
+    assert.equal(grappleOutcome(grab, {total: 5}, new Set()), "bound");
+    assert.equal(grappleOutcome(grab, {total: 7}, new Set(["entangled"])), "bound");
+  });
+  it("only builds Tools attack controls with a usable follow-up damage formula", () => {
+    class RollControl {
+      chat = {flags: {"swade-tools": {itemroll: "item"}}};
+      getItemOwner() { return {items: new Map([["item", this.item]])}; }
+      attackTarget(target) { return target; }
+    }
+    guardToolsAttackTargets(RollControl);
+    const card = new RollControl();
+    for (const type of ["action", "ability", "power", "gear", "weapon"]) {
+      card.item = {type, system: {damage: " "}};
+      assert.equal(card.attackTarget("target"), undefined);
+    }
+    card.item = {type: "weapon", system: {damage: "2d6"}};
+    assert.equal(card.attackTarget("target"), "target");
+    card.chat.flags["swade-tools"].damageaction = "missing";
+    assert.equal(card.attackTarget("target"), undefined);
+    card.item = {type: "action", system: {actions: {additional: {crush: {type: "damage", override: "@str"}}}}};
+    card.chat.flags["swade-tools"].damageaction = "crush";
+    assert.equal(card.attackTarget("target"), "target");
   });
 });

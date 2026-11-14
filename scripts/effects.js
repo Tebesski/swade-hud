@@ -2,6 +2,14 @@ import { ATTRIBUTES, localize, statusDefinition, statusDefinitions } from "./swa
 
 const SHOW_ICON_ALWAYS = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
 
+export function registerMountedStatus() {
+  if (statusDefinition("mounted")) return;
+  const mounted = {id: "mounted", name: "Mounted", img: "icons/tools/smithing/horseshoe-steel-grey.webp",
+    description: "This actor is mounted.", showIcon: SHOW_ICON_ALWAYS};
+  if (Array.isArray(CONFIG.statusEffects)) CONFIG.statusEffects.push(mounted);
+  else CONFIG.statusEffects.mounted = mounted;
+}
+
 function node(tag, className, text) {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -224,6 +232,7 @@ export function effectDuration(effect) {
   effect.updateDuration?.();
   const duration = effect.duration ?? {};
   if (duration.expired) return { label: "Expired", badge: "Expired" };
+  if (effect.flags?.["swade-hud"]?.support) return {label: "Until the next roll with this trait", badge: ""};
   if (!Number.isFinite(duration.value) || duration.value === null) return { label: "Unlimited duration", badge: "" };
   const remaining = Number.isFinite(duration.remaining) ? Math.max(0, Math.ceil(duration.remaining)) : duration.value;
   const units = duration.units || "rounds";
@@ -404,7 +413,8 @@ export class EffectPanels {
     const tags = node("div", "tags");
     const tag = (label) => { if (label) tags.append(node("div", "tag tag_secondary", label)); };
     tag(effectDuration(effect).label);
-    if (effect.isTemporary && effect.expirationText) tag(effect.expirationText);
+    // A timed effect can have no turn-based expiration behavior.
+    if (effect.isTemporary && effect.duration?.expiry) tag(effect.expirationText);
     for (const status of effect.statuses ?? []) tag(localize(statusDefinition(status)?.name ?? status));
     if (effect.system?.conditionalEffect) tag("Conditional effect");
     content.append(tags);

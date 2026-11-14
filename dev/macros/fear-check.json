@@ -1,0 +1,8 @@
+{
+  "_id": "swadehudfear0000",
+  "name": "Fear check",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/terror.svg",
+  "command": "return game.modules.get(\"swade-hud\").api.runExtra(\"fear\", actor ?? undefined, token?.document);"
+}

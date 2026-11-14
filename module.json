@@ -21,6 +21,16 @@
    },
    "esmodules": ["scripts/main.js"],
    "styles": ["styles/swade-hud.css"],
+   "packs": [
+      {
+         "name": "extras",
+         "label": "SWADE HUD Extras",
+         "type": "Macro",
+         "system": "swade",
+         "path": "packs/extras",
+         "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      }
+   ],
    "languages": [
       {
          "lang": "en",

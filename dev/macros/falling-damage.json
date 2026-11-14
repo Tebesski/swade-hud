@@ -1,0 +1,8 @@
+{
+  "_id": "swadehudfalling0",
+  "name": "Falling damage",
+  "type": "script",
+  "scope": "global",
+  "img": "icons/svg/falling.svg",
+  "command": "return game.modules.get(\"swade-hud\").api.runExtra(\"falling\", actor ?? undefined, token?.document);"
+}
