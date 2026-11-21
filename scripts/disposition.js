@@ -1,8 +1,9 @@
+import {t as sbsI18n} from "./i18n.mjs";
 export function dispositionDetails(value) {
   const values = globalThis.CONST?.TOKEN_DISPOSITIONS ?? { FRIENDLY: 1, NEUTRAL: 0, HOSTILE: -1 };
-  if (value === values.FRIENDLY) return { value, key: "friendly", letter: "F", label: "Friendly", icon: "fa-face-smile-halo" };
-  if (value === values.HOSTILE) return { value, key: "hostile", letter: "H", label: "Hostile", icon: "fa-face-angry-horns" };
-  return { value: values.NEUTRAL, key: "neutral", letter: "N", label: "Neutral", icon: "fa-face-meh" };
+  if (value === values.FRIENDLY) return { value, key: "friendly", letter: "F", label: sbsI18n("swade-hud.UI.Friendly_397423500c"), icon: "fa-face-smile-halo" };
+  if (value === values.HOSTILE) return { value, key: "hostile", letter: "H", label: sbsI18n("swade-hud.UI.Hostile_b3478c03ae"), icon: "fa-face-angry-horns" };
+  return { value: values.NEUTRAL, key: "neutral", letter: "N", label: sbsI18n("swade-hud.UI.Neutral_1c6ac69f1e"), icon: "fa-face-meh" };
 }
 
 let activeDialog = null;

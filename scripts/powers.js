@@ -1,16 +1,17 @@
+import {t as sbsI18n} from "./i18n.mjs";
 const TEMPLATES = [
-  { key: "small", preset: "sbt", label: "SBT", title: "Small Blast Template" },
-  { key: "medium", preset: "mbt", label: "MBT", title: "Medium Blast Template" },
-  { key: "large", preset: "lbt", label: "LBT", title: "Large Blast Template" },
-  { key: "scone", preset: "swscone", label: "S Cone", title: "Small Cone Template" },
-  { key: "cone", preset: "swcone", label: "Cone", title: "Cone Template" },
-  { key: "stream", preset: "stream", label: "Stream", title: "Stream Template" },
+  { key: "small", preset: "sbt", get label() { return sbsI18n("swade-hud.UI.SBT_ebc227c70c"); }, get title() { return sbsI18n("swade-hud.UI.SmallBlastTemplate_38f7f81780"); } },
+  { key: "medium", preset: "mbt", get label() { return sbsI18n("swade-hud.UI.MBT_47459e6881"); }, get title() { return sbsI18n("swade-hud.UI.MediumBlastTemplate_ac768697a2"); } },
+  { key: "large", preset: "lbt", get label() { return sbsI18n("swade-hud.UI.LBT_3f592f5540"); }, get title() { return sbsI18n("swade-hud.UI.LargeBlastTemplate_489e11ac15"); } },
+  { key: "scone", preset: "swscone", get label() { return sbsI18n("swade-hud.UI.SCone_da83adcdcd"); }, get title() { return sbsI18n("swade-hud.UI.SmallConeTemplate_b56c576620"); } },
+  { key: "cone", preset: "swcone", get label() { return sbsI18n("swade-hud.UI.Cone_3b5ebcbf43"); }, get title() { return sbsI18n("swade-hud.UI.ConeTemplate_25c64e974f"); } },
+  { key: "stream", preset: "stream", get label() { return sbsI18n("swade-hud.UI.Stream_1eec3071dd"); }, get title() { return sbsI18n("swade-hud.UI.StreamTemplate_b8c7d81785"); } },
 ];
 function betterTemplates() {
   const module = globalThis.game?.modules?.get?.("swade-better-templates");
   return module?.active ? module.api : undefined;
 }
-export function powerPoolUsesNoPP(actor, arcane = "general") {
+export function powerPoolUsesNoPP(actor, arcane = sbsI18n("swade-hud.UI.general_0feae16d55")) {
   const worldRule = Boolean(game.settings.get("swade", "noPowerPoints"));
   const powers = game.modules?.get?.("swade-better-powers");
   const setting = game.modules?.get?.("swade-better-setting");
@@ -30,7 +31,7 @@ export function powerUsesNoPP(item, actor = item.actor ?? item.parent) {
 export function powerCostPresentation(item, actor) {
   const cost = Math.max(0, Number(item.system.ppModifiers?.cost ?? item.system.pp) || 0);
   const noPP = powerUsesNoPP(item, actor);
-  return {cost, noPP, text: noPP ? String(-Math.ceil(cost / 2)) : `${cost} PP`, title: noPP ? "No Power Points casting penalty" : "Power Point cost"};
+  return {cost, noPP, text: noPP ? String(-Math.ceil(cost / 2)) : `${cost} PP`, title: noPP ? sbsI18n("swade-hud.UI.NoPowerPointscastingpenalty_4279deb48f") : sbsI18n("swade-hud.UI.PowerPointcost_f86ba667c7")};
 }
 export function powerTemplates(item) {
   const range = String(item.system.range ?? "").toLowerCase();

@@ -1,11 +1,12 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { ATTRIBUTES, localize, statusDefinition, statusDefinitions } from "./swade.js";
 
 const SHOW_ICON_ALWAYS = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.ALWAYS ?? 2;
 
 export function registerMountedStatus() {
   if (statusDefinition("mounted")) return;
-  const mounted = {id: "mounted", name: "Mounted", img: "icons/tools/smithing/horseshoe-steel-grey.webp",
-    description: "This actor is mounted.", showIcon: SHOW_ICON_ALWAYS};
+  const mounted = {id: "mounted", name: sbsI18n("swade-hud.UI.Mounted_81f39eb58b"), img: "icons/tools/smithing/horseshoe-steel-grey.webp",
+    description: sbsI18n("swade-hud.UI.Thisactorismounted_c900aaaa7e"), showIcon: SHOW_ICON_ALWAYS};
   if (Array.isArray(CONFIG.statusEffects)) CONFIG.statusEffects.push(mounted);
   else CONFIG.statusEffects.mounted = mounted;
 }
@@ -42,8 +43,34 @@ export function actorEffects(actor) {
 }
 export function activeEffects(actor) {
   const neverShowIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0;
-  return actorEffects(actor).filter((effect) => effect.showIcon !== neverShowIcon
+  return actorEffects(actor).filter((effect) => (effect.showIcon !== neverShowIcon || effect.flags?.["swade-hud"]?.showInEffectPanels === true)
     && effect.active !== false && !effect.disabled && !effect.isSuppressed);
+}
+
+export async function showEffectVisibilityDialog(actor, effect) {
+  if (!actor?.isOwner || !actorEffects(actor).includes(effect)) return;
+  const never = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0;
+  const current = effect.showIcon === never
+    ? (effect.flags?.["swade-hud"]?.showInEffectPanels === true ? "panel" : "hidden") : "both";
+  const choices = [
+    ["hidden", sbsI18n("swade-hud.UI.Hidecompletely_21b0df7148"), sbsI18n("swade-hud.UI.Hidetheiconontokensand_514b800fab")],
+    ["panel", sbsI18n("swade-hud.UI.Hideonlyontoken_a23e26ef8c"), sbsI18n("swade-hud.UI.Showtheiconinbotheffect_9081f284df")],
+    ["both", sbsI18n("swade-hud.UI.Showontokenandpanel_a2507c91fd"), sbsI18n("swade-hud.UI.Showtheiconontokensand_52ce980457")],
+  ];
+  const escape = foundry.utils.escapeHTML;
+  const choice = await foundry.applications.api.DialogV2.prompt({
+    classes: ["swade-hud-effect-visibility"], window: {title: "Effect visibility · " + effect.name},
+    rejectClose: false,
+    content: `<div class="standard-form">` + choices.map(([value, label, hint]) =>
+      `<label><input type="radio" name="visibility" value="${value}" ${current === value ? "checked" : ""}> ${escape(label)}<p class="hint">${escape(hint)}</p></label>`).join("")
+      + "</div>",
+    ok: {label: sbsI18n("swade-hud.UI.Apply_31e392d1c0"), callback: (_event, button) => button.form.elements.namedItem("visibility").value},
+  });
+  if (!choices.some(([value]) => value === choice) || !actor.isOwner || !actorEffects(actor).includes(effect)) return;
+  return effect.update({
+    showIcon: choice === "both" ? SHOW_ICON_ALWAYS : never,
+    "flags.swade-hud.showInEffectPanels": choice === "panel",
+  });
 }
 
 const deletionPrompts = new WeakSet();
@@ -53,10 +80,10 @@ export async function confirmEffectDeletion(effect) {
   try {
     return await effect.deleteDialog({
       classes: ["swade-hud-effect-delete"],
-      yes: {label: "Delete", default: false, callback: () => {
+      yes: {label: sbsI18n("swade-hud.UI.Delete_e2d0a54968"), default: false, callback: () => {
         if (effect.parent?.effects.some((entry) => entry === effect)) return effect.delete();
       }},
-      no: {label: "Cancel", default: true}, rejectClose: false
+      no: {label: sbsI18n("swade-hud.UI.Cancel_19766ed6cc"), default: true}, rejectClose: false
     });
   } finally {
     deletionPrompts.delete(effect);
@@ -76,8 +103,8 @@ export async function toggleReactionEffect(actor) {
     const existing = reactionEffect(actor);
     if (existing) return existing.delete();
     return actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: "Reaction used", type: "base", img: "icons/svg/direction.svg",
-      description: "This actor has used their reaction.",
+      name: sbsI18n("swade-hud.UI.Reactionused_60175f88e8"), type: "base", img: "icons/svg/direction.svg",
+      description: sbsI18n("swade-hud.UI.Thisactorhasusedtheirreaction_654e398218"),
       origin: actor.uuid, transfer: false, disabled: false,
       duration: { value: 1, units: "rounds", expiry: "turnEnd", expired: false },
       start: CONFIG.ActiveEffect.documentClass.getEffectStart(),
@@ -167,7 +194,7 @@ export async function applyTimedStatus(actor, statusId, value, units, token = ac
   const definition = actor?.isOwner && statusDefinition(statusId);
   if (!definition) return;
   if (!Number.isSafeInteger(value) || value <= 0 || !["rounds", "minutes", "hours"].includes(units)) {
-    throw new Error("Enter a positive whole-number duration.");
+    throw new Error(sbsI18n("swade-hud.UI.Enterapositivewholenumberduration_0db07fc537"));
   }
   let pending = timedStatuses.get(actor);
   if (!pending) timedStatuses.set(actor, pending = new Map());
@@ -207,12 +234,12 @@ export function showTimedStatusDialog(actor, statusId, token) {
   if (!definition) return;
   const content = node("div", "form-group");
   const id = "swade-hud-status-duration-" + (++nextTimedStatusDialog);
-  const label = node("label", "", "Duration"); label.htmlFor = id;
+  const label = node("label", "", sbsI18n("swade-hud.UI.Duration_4fc52a3c4c")); label.htmlFor = id;
   const duration = node("input");
-  Object.assign(duration, { id, name: "duration", type: "number", min: "1", step: "1", required: true, autofocus: true });
+  Object.assign(duration, { id, name: sbsI18n("swade-hud.UI.duration_caa79af4db"), type: "number", min: "1", step: "1", required: true, autofocus: true });
   duration.setAttribute("value", "1");
-  const units = node("select"); units.name = "units"; units.setAttribute("aria-label", "Duration units");
-  for (const [value, name] of [["rounds", "Rounds"], ["minutes", "Minutes"], ["hours", "Hours"]]) {
+  const units = node("select"); units.name = sbsI18n("swade-hud.UI.units_c981a30c0e"); units.setAttribute("aria-label", sbsI18n("swade-hud.UI.Durationunits_b249354e44"));
+  for (const [value, name] of [["rounds", sbsI18n("swade-hud.UI.Rounds_e9af9cdec8")], ["minutes", sbsI18n("swade-hud.UI.Minutes_4f846a84e7")], ["hours", sbsI18n("swade-hud.UI.Hours_21e8492938")]]) {
     const option = node("option", "", name); option.value = value; units.append(option);
   }
   content.append(label, duration, units);
@@ -220,20 +247,20 @@ export function showTimedStatusDialog(actor, statusId, token) {
     classes: ["swade-hud-status-duration"], window: { title: "Apply " + localize(definition.name) + " - " + actor.name },
     content: content.outerHTML,
     buttons: [
-      { action: "apply", label: "Apply", icon: "fa-solid fa-check", default: true, callback: (_event, button) => {
+      { action: "apply", label: sbsI18n("swade-hud.UI.Apply_31e392d1c0"), icon: "fa-solid fa-check", default: true, callback: (_event, button) => {
         const fields = button.form.elements;
         return applyTimedStatus(actor, statusId, fields.namedItem("duration").valueAsNumber, fields.namedItem("units").value, token);
       } },
-      { action: "cancel", label: "Cancel", icon: "fa-solid fa-xmark", callback: () => {} },
+      { action: "cancel", label: sbsI18n("swade-hud.UI.Cancel_19766ed6cc"), icon: "fa-solid fa-xmark", callback: () => {} },
     ],
   });
 }
 export function effectDuration(effect) {
   effect.updateDuration?.();
   const duration = effect.duration ?? {};
-  if (duration.expired) return { label: "Expired", badge: "Expired" };
-  if (effect.flags?.["swade-hud"]?.support) return {label: "Until the next roll with this trait", badge: ""};
-  if (!Number.isFinite(duration.value) || duration.value === null) return { label: "Unlimited duration", badge: "" };
+  if (duration.expired) return { label: sbsI18n("swade-hud.UI.Expired_424a2551d3"), badge: sbsI18n("swade-hud.UI.Expired_424a2551d3") };
+  if (effect.flags?.["swade-hud"]?.support) return {label: sbsI18n("swade-hud.UI.Untilthenextrollwiththis_5c28d9eb4e"), badge: ""};
+  if (!Number.isFinite(duration.value) || duration.value === null) return { label: sbsI18n("swade-hud.UI.Unlimitedduration_134530e09d"), badge: "" };
   const remaining = Number.isFinite(duration.remaining) ? Math.max(0, Math.ceil(duration.remaining)) : duration.value;
   const units = duration.units || "rounds";
   const unit = remaining === 1 ? units.replace(/s$/, "") : units;
@@ -244,15 +271,15 @@ export function effectDuration(effect) {
 }
 export function changeLabel(change, actor) {
   const labels = {
-    "system.stats.size": "Size", "system.size": "Size",
-    "system.stats.parry.value": "Parry", "system.stats.toughness.value": "Toughness",
-    "system.stats.toughness.armor": "Armour", "system.stats.globalMods.trait": "Trait rolls",
-    "system.stats.globalMods.attack": "Attack rolls", "system.stats.globalMods.damage": "Damage",
-    "system.stats.globalMods.attackRanged": "Ranged attacks", "system.stats.globalMods.attackMelee": "Melee attacks",
-    "system.pace.ground": "Ground Pace",
-    "system.pace": "Pace (all movement)", "system.pace.running.mod": "Running die modifier",
-    "system.damage": "Damage", "system.parry": "Parry bonus", "system.armor": "Armour bonus",
-    "system.actions.traitMod": "Trait modifier", "system.actions.dmgMod": "Damage modifier",
+    "system.stats.size": sbsI18n("swade-hud.UI.Size_1af8519073"), "system.size": sbsI18n("swade-hud.UI.Size_1af8519073"),
+    "system.stats.parry.value": sbsI18n("swade-hud.UI.Parry_e5567f841f"), "system.stats.toughness.value": sbsI18n("swade-hud.UI.Toughness_19cd2c1eec"),
+    "system.stats.toughness.armor": sbsI18n("swade-hud.UI.Armour_642ebd131f"), "system.stats.globalMods.trait": sbsI18n("swade-hud.UI.Traitrolls_7660128157"),
+    "system.stats.globalMods.attack": sbsI18n("swade-hud.UI.Attackrolls_955ec594ab"), "system.stats.globalMods.damage": sbsI18n("swade-hud.UI.Damage_0c874f581a"),
+    "system.stats.globalMods.attackRanged": sbsI18n("swade-hud.UI.Rangedattacks_35be551263"), "system.stats.globalMods.attackMelee": sbsI18n("swade-hud.UI.Meleeattacks_bbc8940217"),
+    "system.pace.ground": sbsI18n("swade-hud.UI.GroundPace_d17c7654b0"),
+    "system.pace": sbsI18n("swade-hud.UI.Paceallmovement_7c8b148616"), "system.pace.running.mod": sbsI18n("swade-hud.UI.Runningdiemodifier_06e0edf23a"),
+    "system.damage": sbsI18n("swade-hud.UI.Damage_0c874f581a"), "system.parry": sbsI18n("swade-hud.UI.Parrybonus_086f2163c3"), "system.armor": sbsI18n("swade-hud.UI.Armourbonus_9ea07e1b9d"),
+    "system.actions.traitMod": sbsI18n("swade-hud.UI.Traitmodifier_ff87ba5302"), "system.actions.dmgMod": sbsI18n("swade-hud.UI.Damagemodifier_bc0d310cd9"),
   };
   if (change.label || labels[change.key]) return change.label || labels[change.key];
   const linked = ATTRIBUTES.find(([key]) => change.key === "system.stats.globalMods." + key);
@@ -404,10 +431,16 @@ export class EffectPanels {
     content.dataset.itemUuid = effect.uuid;
     const title = node("h1", "", effect.name);
     if (!forChat) {
-      action(title, "send-to-chat", "fa-comment-alt", "Send to Chat")
+      action(title, sbsI18n("swade-hud.UI.sendtochat_c2ebc204bb"), "fa-comment-alt", sbsI18n("swade-hud.UI.SendtoChat_531f83e5ee"))
         .addEventListener("click", () => this.sendToChat(actor, effect).catch(this.report));
-      if (actor.isOwner) action(title, "edit", "fa-pencil", "Edit Effect")
+      if (actor.isOwner) action(title, sbsI18n("swade-hud.UI.edit_262121c537"), "fa-pencil", sbsI18n("swade-hud.UI.EditEffect_77b01eb4b2"))
         .addEventListener("click", () => Promise.resolve(statusId ? openStatusEffect(actor, statusId) : effect.sheet.render({ force: true })).catch(this.report));
+      if (actor.isOwner && actorEffects(actor).includes(effect)) {
+        action(title, sbsI18n("swade-hud.UI.visibility_7d2fb3da93"), "fa-eye", sbsI18n("swade-hud.UI.Effectvisibility_7a95d96c5c")).addEventListener("click", () => {
+          this.hideTooltip();
+          showEffectVisibilityDialog(actor, effect).catch(this.report);
+        });
+      }
     }
     content.append(title);
     const tags = node("div", "tags");
@@ -416,7 +449,7 @@ export class EffectPanels {
     // A timed effect can have no turn-based expiration behavior.
     if (effect.isTemporary && effect.duration?.expiry) tag(effect.expirationText);
     for (const status of effect.statuses ?? []) tag(localize(statusDefinition(status)?.name ?? status));
-    if (effect.system?.conditionalEffect) tag("Conditional effect");
+    if (effect.system?.conditionalEffect) tag(sbsI18n("swade-hud.UI.Conditionaleffect_61fd3d5eef"));
     content.append(tags);
     let source = effect.parent?.documentName === "Item" ? effect.parent : null;
     if (!source && effect.origin) {
@@ -426,7 +459,7 @@ export class EffectPanels {
     if (sourceName) content.append(node("div", "effect-source", "Source: " + sourceName));
     if (!forChat && instructions && actor.isOwner) {
       const instructions = node("div", "instructions");
-      instructions.append(node("div", "", "[Left Click] Open effect"), node("div", "", "[Right Click] Confirm removal"));
+      instructions.append(node("div", "", sbsI18n("swade-hud.UI.LeftClickOpeneffect_450049bca8")), node("div", "", sbsI18n("swade-hud.UI.RightClickConfirmremoval_fde46a923b")));
       content.append(instructions);
     }
     const description = node("div", "description");
@@ -434,10 +467,10 @@ export class EffectPanels {
       effect.description || source?.system?.description || "", {
         relativeTo: effect, rollData: actor.getRollData?.() ?? {}, secrets: !forChat && actor.isOwner,
       });
-    if (!description.textContent.trim()) description.append(node("p", "", "No description."));
+    if (!description.textContent.trim()) description.append(node("p", "", sbsI18n("swade-hud.UI.Nodescription_06a6948209")));
     const changes = Array.from(effect.system?.changes ?? effect.changes ?? []);
     if (changes.length) {
-      description.append(node("h4", "", "Modifiers"));
+      description.append(node("h4", "", sbsI18n("swade-hud.UI.Modifiers_072da57fac")));
       const list = node("ul", "effect-modifiers");
       for (const change of changes) list.append(node("li", "", changeLabel(change, actor) + ": " + change.value));
       description.append(list);

@@ -1,6 +1,51 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
-import { EffectPanels, effectListTooltipPosition } from "../scripts/effects.js";
+import { activeEffects, EffectPanels, effectListTooltipPosition, showEffectVisibilityDialog } from "../scripts/effects.js";
+
+describe("Effect icon visibility", () => {
+  let actor, effect, choice, updates;
+  beforeEach(() => {
+    updates = [];
+    effect = {name: "Blessing", id: "blessing", active: true, showIcon: 2, flags: {},
+      update: async data => {
+        updates.push(data);
+        effect.showIcon = data.showIcon;
+        effect.flags["swade-hud"] = {showInEffectPanels: data["flags.swade-hud.showInEffectPanels"]};
+      }};
+    actor = {isOwner: true, effects: [effect]};
+    globalThis.CONST = {ACTIVE_EFFECT_SHOW_ICON: {NEVER: 0, ALWAYS: 2}};
+    globalThis.foundry = {utils: {escapeHTML: String}, applications: {api: {DialogV2: {prompt: async () => choice}}}};
+  });
+  it("hides only the token icon while retaining both HUD icon panels", async () => {
+    choice = "panel";
+    await showEffectVisibilityDialog(actor, effect);
+    assert.equal(effect.showIcon, 0);
+    assert.deepEqual(activeEffects(actor), [effect]);
+  });
+  it("hides both icon panels and restores token and panel visibility", async () => {
+    choice = "hidden";
+    await showEffectVisibilityDialog(actor, effect);
+    assert.deepEqual(activeEffects(actor), []);
+    choice = "both";
+    await showEffectVisibilityDialog(actor, effect);
+    assert.equal(effect.showIcon, 2);
+    assert.deepEqual(activeEffects(actor), [effect]);
+  });
+  it("preserves Never configured in the effect sheet until panel visibility is explicitly selected", () => {
+    effect.showIcon = 0;
+    assert.deepEqual(activeEffects(actor), []);
+  });
+  it("leaves effects unchanged on cancellation and rejects unowned or inactive preview documents", async () => {
+    choice = null;
+    await showEffectVisibilityDialog(actor, effect);
+    choice = "hidden";
+    actor.isOwner = false;
+    await showEffectVisibilityDialog(actor, effect);
+    actor.isOwner = true;
+    await showEffectVisibilityDialog(actor, {...effect});
+    assert.equal(updates.length, 0);
+  });
+});
 
 describe("Effects list tooltip placement", () => {
   const panel = { left: 100, right: 700 }, row = { top: 200, height: 40 }, tooltip = { width: 200, height: 100 };

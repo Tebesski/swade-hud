@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { importSwadeTools } from "./tools-imports.js";
 
 const pending = [];
@@ -42,8 +43,8 @@ export async function toolsTargetDefense(actor, kind) {
       if (shield) modifiers.push({ label: shield.name, value: Number(shield.system.cover) });
     }
   }
-  edge("Combat Acrobat", -1);
-  edge("Rifts Uncanny Reflexes", -2, true);
+  edge(sbsI18n("swade-hud.UI.CombatAcrobat_0316bbeeb8"), -1);
+  edge(sbsI18n("swade-hud.UI.RiftsUncannyReflexes_96cc6b32c9"), -2, true);
   return modifiers;
 }
 export async function toolsForecast(context, root, damage = false, actionId) {

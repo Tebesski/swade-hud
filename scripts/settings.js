@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { MODULE_ID, SWADE_TOOLS_SETTING, SWADE_TOOLS_GLOBAL_SETTING } from "./swade.js";
 import { TARGETED_DAMAGE_SOAK_SETTING } from "./targeted-damage.js";
 
@@ -16,7 +17,7 @@ export function registerSettings() {
     hint: "SWADEHUD.settings.disableSwadeToolsDialogsGlobally.hint",
     scope: "client", config: true, type: Boolean, default: false, requiresReload: false,
   });
-  for (const key of ["tokenDistance", "damageEstimate", "successRates", "chatRollRange"]) {
+  for (const key of [sbsI18n("swade-hud.UI.tokenDistance_022ff0b703"), sbsI18n("swade-hud.UI.damageEstimate_7eb63a200e"), sbsI18n("swade-hud.UI.successRates_d35bcbd1bb"), "chatRollRange"]) {
     game.settings.register(MODULE_ID, key, {
       name: "SWADEHUD.settings." + key + ".name",
       hint: "SWADEHUD.settings." + key + ".hint",

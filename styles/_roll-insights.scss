@@ -19,6 +19,10 @@ body.game .swade-hud-tools-insights {
   .insight-unavailable { font-size: 11px; opacity: 0.7; margin: 0.2em 0; }
 }
 .swade-hud-roll-insights {
+  max-height: min(15rem, 28vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 7px;
   border: 1px solid var(--color-border-light-2, #8886);
   border-radius: 3px;

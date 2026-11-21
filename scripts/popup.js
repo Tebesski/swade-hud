@@ -1,8 +1,10 @@
+import {t as sbsI18n} from "./i18n.mjs";
 // PF2e HUD's item popup uses the native ApplicationV2 window frame. Retain that
 // frame and its item-summary container while enriching SWADE's description.
 import { renderItemSummary } from "./item-summary.js";
 import { showModifierDialog } from "./modifiers.js";
 import { renderItemActions } from "./item-actions.js";
+import { raiseHudPanel } from "./panel-focus.js";
 export function createItemPopup(actor, item, { actions = false, anchor } = {}) {
   if (actions) return createShortcutPopup(actor, item, anchor);
   const modify = (spec) => showModifierDialog(actor, actor.token, spec)
@@ -22,9 +24,9 @@ export function createItemPopup(actor, item, { actions = false, anchor } = {}) {
       button.type = "button";
       button.className = "header-control";
       button.dataset.action = "send-to-chat";
-      button.title = "Send to chat";
-      button.setAttribute("aria-label", "Send to chat");
-      button.innerHTML = '<i class="fa-solid fa-message" aria-hidden="true"></i>';
+      button.title = sbsI18n("swade-hud.UI.Sendtochat_6798b9b16e");
+      button.setAttribute("aria-label", sbsI18n("swade-hud.UI.Sendtochat_6798b9b16e"));
+      button.innerHTML = `<i class="fa-solid fa-message" aria-hidden="true"></i>`;
       frame.querySelector(".window-title")?.insertAdjacentElement("afterend", button);
       if (item.type === "skill") frame.querySelector(".window-title")?.addEventListener("contextmenu", (event) => {
         event.preventDefault();
@@ -58,9 +60,15 @@ function createShortcutPopup(actor, item, anchor) {
       window: { frame: false, positioned: true, resizable: false, minimizable: false },
       position: { width: "auto", height: "auto" },
     };
+    async _renderFrame(options) {
+      const frame = await super._renderFrame(options);
+      frame.addEventListener("pointerdown", () => raiseHudPanel(frame), { capture: true });
+      return frame;
+    }
     async _renderHTML() {
       return renderItemActions(actor, item, async () => {
         if (!this.element?.isConnected) return;
+        if (!actor.items.has(item.id)) return this.close({ animate: false });
         await this.render({ force: true });
         this.positionAtShortcut();
       }, { compact: true });

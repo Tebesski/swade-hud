@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { rollAttribute, rollSkill, useItem, localize, swadeToolsDialogsDisabled } from "./swade.js";
 import { installToolsPowerCast } from "./power-chat.js";
 import { importSwadeTools } from "./tools-imports.js";
@@ -23,7 +24,7 @@ export function wrapToolsDialogClasses(SystemRoll, ItemDialog) {
     const additionalMods = (instance.modifiers ?? []).map(({ reason, mod }) => ({ label: reason, value: mod }));
     if (instance.vehicle) {
       const value = Math.max(-4, -Number(instance.vehicle.system.wounds?.value || 0));
-      if (value) additionalMods.push({ label: localize("SWADE.Handling", "Handling"), value });
+      if (value) additionalMods.push({ label: localize("SWADE.Handling", sbsI18n("swade-hud.UI.Handling_90e9482cff")), value });
     }
     return { additionalMods };
   };

@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 export const TARGETED_DAMAGE_SOAK_SETTING = "fixTargetedDamageSoak";
 const soaking = new WeakSet();
 
@@ -25,13 +26,13 @@ export function patchTargetedDamageDialog(app, html) {
   if (!spender) { existing?.remove(); return; }
   if (existing) return;
   const gm = spender === game.user;
-  if (footer.querySelector(`[data-action="${gm ? "bennyGMSoak" : "bennySoak"}"]`)) return;
+  if (footer.querySelector(`[data-action="${gm ? sbsI18n("swade-hud.UI.bennyGMSoak_173f35847c") : sbsI18n("swade-hud.UI.bennySoak_92fcae6188")}"]`)) return;
 
   const button = document.createElement("button");
   button.type = "button";
   button.className = "swade-hud-targeted-soak";
-  const verb = app.object.attemptedSoak ? "Reroll Soak" : "Soak";
-  button.textContent = `${verb} for ${gm ? "GM " : ""}Benny`;
+  const verb = app.object.attemptedSoak ? sbsI18n("swade-hud.UI.RerollSoak_783cb422a4") : sbsI18n("swade-hud.UI.Soak_5118a9fc52");
+  button.textContent = sbsI18n("swade-hud.UI.forBenny_efb077bf63", {p0: (verb), p1: (gm ? "GM " : "")});
   button.addEventListener("click", async () => {
     if (soaking.has(app) || soakSpender(app) !== spender) return;
     soaking.add(app);

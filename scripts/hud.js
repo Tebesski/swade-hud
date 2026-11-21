@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import {
   MODULE_ID, ATTRIBUTES, SIDEBARS, PHYSICAL, localize, itemsOf,
   sorted, canRollSkills, dieLabel, powerPools, statusDefinitions,
@@ -5,24 +6,45 @@ import {
   hasSwadeToolsItemDialog, openSwadeToolsItemDialog,
 } from "./swade.js";
 import { createItemPopup } from "./popup.js";
+import { raiseHudPanel } from "./panel-focus.js";
 import { EffectPanels, actorEffects, confirmEffectDeletion, nonSystemEffects, effectDuration, findStatusEffect, openStatusEffect, statusEffectDocument, showTimedStatusDialog, toggleHudStatus, reactionEffect, toggleReactionEffect } from "./effects.js";
 import { dispositionDetails, showDispositionDialog } from "./disposition.js";
 import { powerTemplates, placePowerTemplate, isTemplateRange, isBoostLowerTrait, powerPoolUsesNoPP, powerCostPresentation } from "./powers.js";
 import { showModifierDialog } from "./modifiers.js";
-import { actionKind, actionUsesSkill, coreSkillDocument, generateBasicActions, isOpposedAction, rollCommonSkillAction, skillActions } from "./basic-actions.js";
+import { actionKind, actionUsesSkill, basicActionLabel, COMMON_SKILL_ACTIONS, commonSkillActionLabel, coreSkillDocument, generateBasicActions, isOpposedAction, isUnskilledAttempt, rollCommonSkillAction, skillActions } from "./basic-actions.js";
 import { holdCombatant, naturalHealingCooldown, runExtra, EXTRAS } from "./extras.js";
 import { attackOptions, attackOptionState, setAttackOption } from "./attack-options.js";
 import { itemShortcutActions } from "./item-actions.js";
 import { bennyPool } from "./bennies.js";
 import { actorSize, adjustScale, applySizeChange, showSizeDialog, showSizeReference } from "./scale.js";
 
-const ITEM_CONTEXT_TARGET = ".item[data-item-id], .variants[data-item-id]";
+const ITEM_CONTEXT_TARGET = sbsI18n("swade-hud.UI.itemdataitemidvariantsdata_db9ad42901");
+
+function styleTier(item, parts) {
+  game.modules?.get?.("swade-better-money")?.api?.styleItemTier?.(item, parts);
+}
 
 function node(tag, className, text) {
   const el = document.createElement(tag);
   if (className) el.className = className;
   if (text !== undefined) el.textContent = String(text);
   return el;
+}
+
+function coatingIcons(item, hoverable = false) {
+  const effects = game.modules.get("swade-better-usables")?.api?.getCoatingEffects?.(item);
+  if (!effects?.length) return;
+  const icons = node("span", "swade-hud-coatings");
+  if (!hoverable) icons.setAttribute("aria-hidden", "true");
+  for (const effect of effects) {
+    const image = node("img");
+    image.src = effect.img;
+    image.alt = hoverable ? effect.name : "";
+    image.draggable = false;
+    if (hoverable) image.title = effect.name;
+    icons.append(image);
+  }
+  return icons;
 }
 function icon(name, classes = "") {
   const el = node("i", "fa-solid " + name + (classes ? " " + classes : ""));
@@ -247,13 +269,13 @@ export class SwadeHUD {
     link(effects, "toggle-effects", "fa-person-rays", "", "Show / hide active effects");
     menu.append(effects);
     const group = node("div", "group");
-    link(group, "toggle-avatar", "fa-image-user", "", "Use actor / token portrait");
-    link(group, "toggle-clean", "fa-chart-bar", "", "Show portrait statistics on hover");
+    link(group, "toggle-avatar", "fa-image-user", "", sbsI18n("swade-hud.UI.Useactortokenportrait_468f2a306b"));
+    link(group, "toggle-clean", "fa-chart-bar", "", sbsI18n("swade-hud.UI.Showportraitstatisticsonhover_22fbe4849e"));
     menu.append(group);
     const bottom = node("div", "group bottom");
     link(bottom, "hotbar-lock", ui.hotbar?.locked ? "fa-lock" : "fa-lock-open", "", "Lock / unlock hotbar");
     link(bottom, "hotbar-mute", game.audio?.globalMute ? "fa-volume-xmark" : "fa-volume", "", "Mute / unmute audio");
-    link(bottom, "hotbar-clear", "fa-trash", "", "Clear hotbar");
+    link(bottom, "hotbar-clear", "fa-trash", "", sbsI18n("swade-hud.UI.Clearhotbar_496ee3fc7a"));
     menu.append(bottom);
   }
 
@@ -262,7 +284,7 @@ export class SwadeHUD {
     const portrait = panel(root, "portrait");
     const avatar = node("div", "avatar");
     avatar.dataset.action = "open-actor";
-    avatar.title = "Open character sheet";
+    avatar.title = sbsI18n("swade-hud.UI.Opencharactersheet_d9a9cd7e5d");
     const source = (this.appearance.tokenAvatar ? this.token?.document?.texture?.src : actor.img)
       || actor.img || "icons/svg/mystery-man.svg";
     const media = node(/\.(webm|mp4)(\?|$)/i.test(source) ? "video" : "img", "image");
@@ -282,20 +304,20 @@ export class SwadeHUD {
     const parry = node("div");
     parry.dataset.section = "parry";
     parry.dataset.modifier = "parry";
-    parry.title = "Parry";
+    parry.title = sbsI18n("swade-hud.UI.Parry_e5567f841f");
     parry.append(icon("fa-swords"), node("span", "", actor.system.stats?.parry?.value ?? "—"));
     const toughness = node("div");
     toughness.dataset.section = "toughness";
     toughness.dataset.modifier = "toughness";
-    toughness.title = "Toughness (Armour)";
+    toughness.title = sbsI18n("swade-hud.UI.ToughnessArmour_9e8caf20ac");
     toughness.append(icon("fa-shield-halved"));
     const values = node("span", "toughness-values");
     const value = node("span", "", actor.system.stats?.toughness?.value ?? "—");
     value.dataset.modifier = "toughness";
-    value.title = "Toughness · Right-click for a temporary modifier";
+    value.title = sbsI18n("swade-hud.UI.ToughnessRightclickforatemporary_6a53322cd2");
     const armour = node("span", "", "(" + (actor.system.stats?.toughness?.armor ?? 0) + ")");
     armour.dataset.modifier = "armour";
-    armour.title = "Armour · Right-click for a temporary modifier";
+    armour.title = sbsI18n("swade-hud.UI.ArmourRightclickforatemporary_ccf63267d5");
     values.append(value, document.createTextNode(" "), armour);
     toughness.append(values);
     stats.append(parry, toughness);
@@ -307,7 +329,7 @@ export class SwadeHUD {
     const adjust = link(section, "resource-adjust", glyph, "", title + " · Left-click +1 · Right-click −1", { key });
     adjust.className = "stat-resource-icon";
     if (key === "wounds") {
-      adjust.title += " · Shift+Left-click: toggle Shaken · Shift+Right-click: roll Spirit to recover";
+      adjust.title += sbsI18n("swade-hud.UI.ShiftLeftclicktoggleShakenShift_0d938cbc6a");
       adjust.setAttribute("aria-label", adjust.title);
     }
     if (double) {
@@ -328,7 +350,7 @@ export class SwadeHUD {
     const actor = this.actor;
     const details = panel(root, "details");
     this.statLink(details, "advance", "fa-user-graduate", actor.system.advances?.value ?? "—", "Advances");
-    this.statLink(details, "running", "fa-shoe-prints", actor.system.pace?.default ?? actor.system.pace?.ground ?? "—", "Pace · roll running");
+    this.statLink(details, "running", "fa-shoe-prints", actor.system.pace?.default ?? actor.system.pace?.ground ?? "—", sbsI18n("swade-hud.UI.Pacerollrunning_ac22b4dc7b"));
     const statistics = panel(root, "statistics");
     for (const [key, label, glyph] of ATTRIBUTES) {
       const data = actor.system.attributes?.[key];
@@ -345,7 +367,7 @@ export class SwadeHUD {
     const resources = panel(root, "resources");
     const pools = powerPools(actor).filter(([name]) => !powerPoolUsesNoPP(actor, name));
     const [poolName, pool] = pools.find(([name]) => name === "general") ?? pools[0] ?? [];
-    if (!game.settings.get("swade", "noPowerPoints") && pool) this.slider(resources, "powerPoints", "fa-sparkles", pool.value, "Power Points", { pool: poolName });
+    if (!game.settings.get("swade", "noPowerPoints") && pool) this.slider(resources, "powerPoints", "fa-sparkles", pool.value, sbsI18n("swade-hud.UI.PowerPoints_844847817f"), { pool: poolName });
     const bennies = bennyPool(actor);
     const bennyRow = this.slider(resources, "bennies", bennies.icon, bennies.value, bennies.label);
     resources.classList.toggle("bennies-only", !resources.querySelector('[data-section="powerPoints"]'));
@@ -372,7 +394,7 @@ export class SwadeHUD {
     if (key === "powerPoints") {
       row.dataset.modifier = "powerPoints";
       row.dataset.pool = extra.pool ?? "";
-      amount.title += " · Shift+right-click for a temporary modifier";
+      amount.title += sbsI18n("swade-hud.UI.Shiftrightclickforatemporary_226df1efaa");
       resourceIcon.title = amount.title;
     }
     row.append(slider);
@@ -429,10 +451,13 @@ export class SwadeHUD {
         slot.tabIndex = 0;
         const image = node("div", "image");
         image.style.backgroundImage = "url(" + JSON.stringify(info.img) + ")";
+        styleTier(info.doc, {icon: image});
         slot.append(image);
         const glyph = node("div", "icon");
         glyph.append(icon(info.icon));
         slot.append(glyph, node("div", "overlay"));
+        const coatings = coatingIcons(info.doc);
+        if (coatings) slot.append(coatings);
         slot.addEventListener("mouseenter", () => this.showTooltip(slot, info));
         slot.addEventListener("mouseleave", () => this.hideTooltip());
       }
@@ -442,19 +467,19 @@ export class SwadeHUD {
   buildShortcutMenu(root) {
     const menu = panel(root, "shortcuts-menu");
     const tabs = node("div", "tabs");
-    const title = "Shortcut page · Left-click: next · Right-click: previous";
+    const title = sbsI18n("swade-hud.UI.ShortcutpageLeftclicknextRight_f69d18107c");
     link(tabs, "shortcut-page", "fa-grid-2", "", title, { delta: 1 }).className = "shortcut-page-icon";
     const slider = node("div", "slider");
     link(slider, "shortcut-page", "", this.page + 1, title, { delta: 1 }).className = "value";
     tabs.append(slider);
     menu.append(tabs);
     const used = Boolean(reactionEffect(this.actor));
-    const reaction = link(menu, "reaction", "fa-rotate-right", "", used ? "Remove Reaction used" : "Mark Reaction used (1 round)");
+    const reaction = link(menu, "reaction", "fa-rotate-right", "", used ? sbsI18n("swade-hud.UI.RemoveReactionused_8fdf41998d") : sbsI18n("swade-hud.UI.MarkReactionused1round_611e3011d0"));
     reaction.classList.toggle("active", used);
     reaction.setAttribute("aria-pressed", String(used));
-    link(menu, "prototype-token", "fa-user-pen", "", "Prototype Token");
+    link(menu, "prototype-token", "fa-user-pen", "", sbsI18n("swade-hud.UI.PrototypeToken_d09ca5b5c7"));
     link(menu, "scale", "fa-expand", actorSize(this.actor),
-      "Scale · Left-click: +1 · Right-click: −1 · Shift+Left-click: enter size · Shift+Right-click: size reference");
+      sbsI18n("swade-hud.UI.ScaleLeftclick1Rightclick_4320aa025c"));
     const bin = panel(menu, "shortcut-bin");
     bin.dataset.action = "shortcut-bin";
     bin.append(icon("fa-trash-can"));
@@ -462,6 +487,7 @@ export class SwadeHUD {
 
   renderSidebar() {
     this.effectPanels.hideListTooltip();
+    const zIndex = this.sidebar?.style.zIndex;
     const scroll = this.sidebar?.querySelector(".inner")?.scrollTop ?? 0;
     const search = this.sidebar?.querySelector("input[type=text]")?.value ?? "";
     const filterVisible = this.sidebar?.querySelector('[data-panel="filter"]')?.classList.contains("visible");
@@ -492,7 +518,7 @@ export class SwadeHUD {
     filter.classList.toggle("visible", Boolean(search) || !!filterVisible);
     const field = node("input");
     field.type = "text";
-    field.placeholder = "Filter";
+    field.placeholder = sbsI18n("swade-hud.UI.Filter_638e249f4a");
     field.value = search;
     field.addEventListener("input", () => {
       this.filteredSkillExpansion.clear();
@@ -501,6 +527,9 @@ export class SwadeHUD {
     filter.append(field);
     document.body.append(sidebar);
     this.sidebar = sidebar;
+    if (zIndex) sidebar.style.zIndex = zIndex;
+    else raiseHudPanel(sidebar);
+    sidebar.addEventListener("pointerdown", () => raiseHudPanel(sidebar), { capture: true });
     if (this.activeSidebar === "extras") {
       this.bindEffectContextMenu(sidebar);
       sidebar.addEventListener("scroll", () => this.effectPanels.positionTooltip(), true);
@@ -531,9 +560,21 @@ export class SwadeHUD {
     const columnWidth = parseFloat(style.getPropertyValue("--max-column-width")) * em;
     list.style.width = columnWidth + "px";
     const maxColumns = Math.max(1, Math.min(5, Math.floor((innerWidth / scale - 28) / columnWidth)));
+    let contentHeight = list.scrollHeight;
+    let columnHeight = Math.max(50, available - 30);
+    if (this.activeSidebar === "skills") {
+      const sections = [...list.querySelectorAll(".skill-section:not([hidden])")];
+      const height = section => section.offsetHeight + parseFloat(getComputedStyle(section).marginBottom);
+      const footer = sections.find(section => section.classList.contains("unskilled-attempt"));
+      const heights = sections.filter(section => section !== footer).map(height);
+      // Skill accordions stay together. A tall accordion sets the minimum
+      // column height, while Unskilled Attempt spans below all columns.
+      contentHeight = heights.reduce((total, value) => total + value, 0);
+      columnHeight = Math.max(50, columnHeight - (footer ? height(footer) : 0), ...heights);
+    }
     // Effects have two explicit columns, rather than flowing across CSS columns.
     const columns = this.activeSidebar === "extras" ? Math.max(1, list.querySelectorAll(".effect-column:not([hidden])").length)
-      : Math.min(maxColumns, Math.max(1, Math.ceil(list.scrollHeight / Math.max(50, available - 30))));
+      : Math.min(maxColumns, Math.max(1, Math.ceil(contentHeight / columnHeight)));
     sidebar.style.setProperty("--nb-columns", String(columns));
     const listWidth = columns * columnWidth + (columns - 1) * 4;
     list.style.width = (this.activeSidebar === "extras"
@@ -584,11 +625,11 @@ export class SwadeHUD {
       heading.hidden = Boolean(query) && !heading.closest(".skill-section") && !members.some(entry => !entry.hidden);
     });
     let empty = this.sidebar.querySelector(".search-empty");
-    if (!empty) { empty = node("p", "empty search-empty", "No matches"); this.sidebar.querySelector(".item-list").append(empty); }
+    if (!empty) { empty = node("p", "empty search-empty", sbsI18n("swade-hud.UI.Nomatches_2df01a03ff")); this.sidebar.querySelector(".item-list").append(empty); }
     empty.hidden = !query || [...entries].some(entry => !entry.hidden);
     this.positionSidebar();
   }
-  itemShell(parent, item, className = "", tag = "div") {
+  itemShell(parent, item, className = "", tag = sbsI18n("swade-hud.UI.div_cd35a24260")) {
     const row = node(tag, "item " + className);
     row.dataset.itemId = item.id;
     row.dataset.filterValue = item.name.toLocaleLowerCase();
@@ -604,10 +645,13 @@ export class SwadeHUD {
     img.src = item.img || "icons/svg/item-bag.svg";
     img.alt = "";
     image.append(img, icon("fa-book-open", "chat"));
+    styleTier(item, {icon: image});
   }
   itemName(parent, item) {
     const name = node("div", "name");
-    link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat").dataset.itemChatGesture = "";
+    const label = link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat");
+    label.dataset.itemChatGesture = "";
+    styleTier(item, {name: label});
     parent.append(name);
     return name;
   }
@@ -644,14 +688,18 @@ export class SwadeHUD {
       toggles.append(label);
     }
     list.append(toggles);
-    if (this.owned) link(list, "generate-actions", "fa-list-check", "Generate basic actions", "Generate basic actions");
+    if (this.owned) link(list, "generate-actions", "fa-list-check", sbsI18n("swade-hud.UI.Generatebasicactions_f3bcac1a6c"), sbsI18n("swade-hud.UI.Generatebasicactions_f3bcac1a6c"));
     const weapons = sorted(itemsOf(this.actor, "weapon"));
     header(list, "Attacks");
     for (const item of weapons) {
       const row = this.itemShell(list, item, "attack ready");
       const name = node("div", "name weapon-heading");
       this.itemImage(name, item);
-      link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat").dataset.itemChatGesture = "";
+      const label = link(name, "item-description", "", item.name, item.name + " · Shift-click to send to chat");
+      label.dataset.itemChatGesture = "";
+      styleTier(item, {name: label});
+      const coatings = coatingIcons(item, true);
+      if (coatings) name.append(coatings);
       row.append(name);
       const variants = node("div", "variants");
       variants.append(icon("fa-sword", "category"));
@@ -667,7 +715,7 @@ export class SwadeHUD {
       }
       this.actionVariants(row, item);
     }
-    if (!weapons.length) list.append(node("p", "empty", "No weapons"));
+    if (!weapons.length) list.append(node("p", "empty", sbsI18n("swade-hud.UI.Noweapons_0097db6895")));
     this.actionItems(list, itemsOf(this.actor, "action", "ability")
       .filter(item => !item.system.hidden && !actionUsesSkill(item)), "Actions & Abilities");
   }
@@ -675,14 +723,19 @@ export class SwadeHUD {
     if (!items.length) return;
     header(list, title);
     for (const item of this.favoriteActions(items)) {
-      this.actionRow(list, item);
+      const row = this.actionRow(list, item);
+      const coatings = coatingIcons(item, true);
+      if (coatings) row.append(coatings);
     }
   }
   actionRow(parent, item) {
     const row = this.itemShell(parent, item, "action trait-action-row");
     this.itemImage(row, item);
-    const name = link(row, "choose-action", "", item.name, "Use " + item.name + " · Shift-click to send to chat");
+    const label = basicActionLabel(item);
+    row.dataset.filterValue += " " + label.toLocaleLowerCase();
+    const name = link(row, "choose-action", "", label, "Use " + label + " · Shift-click to send to chat");
     name.dataset.itemChatGesture = "";
+    styleTier(item, {name});
     this.actionStar(row, item);
     return row;
   }
@@ -694,7 +747,7 @@ export class SwadeHUD {
     }
     if (!actions.length) return this.showDescription(item);
     const choice = actions.length === 1 ? actions[0].key : await foundry.applications.api.DialogV2.wait({
-      window: {title: item.name}, classes: ["swade-hud-action-choices"], rejectClose: false,
+      window: {title: basicActionLabel(item)}, classes: ["swade-hud-action-choices"], rejectClose: false,
       buttons: actions.map(({key, label}) => ({action: key, label: foundry.utils.escapeHTML(label)})),
     });
     if (choice && this.actor === actor && actor.items.get(item.id) === item) {
@@ -708,19 +761,22 @@ export class SwadeHUD {
   actionStar(parent, item) {
     const starred = this.profile.actionFavorites?.includes(item.id) ?? false;
     const button = link(parent, "action-favorite", starred ? "fa-star" : "fa-star fa-regular", "",
-      (starred ? "Unstar " : "Star ") + item.name, { itemId: item.id });
+      (starred ? sbsI18n("swade-hud.UI.Unstar_053662946a") : sbsI18n("swade-hud.UI.Star_0bb8478a5e")) + item.name, { itemId: item.id });
     const glyph = button.querySelector("i");
     if (!starred) glyph.classList.remove("fa-solid");
     button.className = "action-star" + (starred ? " starred" : "");
     button.setAttribute("aria-pressed", String(starred));
   }
   skillSidebar(list) {
-    for (const item of sorted(itemsOf(this.actor, "skill"))) {
+    const skills = sorted(itemsOf(this.actor, "skill"));
+    const unskilled = skills.find(isUnskilledAttempt);
+    for (const item of [...skills.filter(skill => !isUnskilledAttempt(skill)), ...(unskilled ? [unskilled] : [])]) {
       const section = node("section", "skill-section");
+      if (item === unskilled) section.classList.add("unskilled-attempt");
       list.append(section);
       const row = this.itemShell(section, item, "statistic proficient skill-heading", "h3");
       row.dataset.modifier = "skill";
-      row.title = "Right-click: Edit / Delete · Shift+Right-click: temporary skill modifier";
+      row.title = sbsI18n("swade-hud.UI.RightclickEditDeleteShiftRight_7ac4ad51ae");
       this.itemImage(row, item);
       const name = node("div", "name");
       const roll = link(name, "skill", "", "", "Roll " + item.name, { itemId: item.id });
@@ -732,10 +788,17 @@ export class SwadeHUD {
         const attribute = node("span", "attribute-name", localize(attr[1], attr[0]));
         attribute.dataset.modifier = "attribute";
         attribute.dataset.attribute = attr[0];
-        attribute.title = "Right-click for a temporary attribute modifier";
+        attribute.title = sbsI18n("swade-hud.UI.Rightclickforatemporaryattribute_a804eb6898");
         row.append(attribute);
       }
-      if (["unskilled", "unskilled-attempt"].includes(item.system.swid)) continue;
+      if (item === unskilled) continue;
+      const common = node("div", "skill-common");
+      common.dataset.filterValue = ("support test earn " + commonSkillActionLabel("earn") + " " + item.name).toLocaleLowerCase();
+      for (const kind of Object.keys(COMMON_SKILL_ACTIONS)) {
+        const label = commonSkillActionLabel(kind);
+        link(common, "skill-common", "", label, label + " with " + item.name, {itemId: item.id, kind});
+      }
+      section.append(common);
       const toggle = link(section, "toggle-skill-actions", "fa-chevron-right", "Actions", "Actions for " + item.name,
         { itemId: item.id });
       toggle.className = "skill-actions-toggle";
@@ -746,18 +809,24 @@ export class SwadeHUD {
       section.append(body);
       this.setSkillActionsExpanded(section, this.isSkillExpanded(item.id));
       const actions = Map.groupBy(skillActions(this.actor, item), entry => entry.item);
-      const common = node("div", "skill-common");
-      common.dataset.filterValue = "support test earn " + item.name.toLocaleLowerCase();
-      for (const [kind, label] of [["support", "Support"], ["test", "Test"], ["earn", "Earn"]]) {
-        link(common, "skill-common", "", label, label + " with " + item.name, {itemId: item.id, kind});
-      }
-      body.append(common);
       const entries = [...actions.keys()].filter(action => !["support", "test", "earn"].includes(actionKind(action)));
       for (const action of this.favoriteActions(entries)) {
         const actionRow = this.actionRow(body, action);
         actionRow.dataset.filterValue += " " + item.name.toLocaleLowerCase()
           + " " + actions.get(action).map(entry => entry.variant ?? "").join(" ").toLocaleLowerCase();
       }
+    }
+    if (!unskilled && canRollSkills(this.actor)) {
+      const title = localize("SWADE.Unskilled", sbsI18n("swade-hud.UI.UnskilledAttempt_63ecc95eac"));
+      const section = node("section", "skill-section unskilled-attempt");
+      const row = node("h3", "item statistic proficient skill-heading");
+      row.dataset.filterValue = title.toLocaleLowerCase();
+      const name = node("div", "name");
+      const roll = link(name, "unskilled", "fa-dice-d4", "", "Roll " + title);
+      roll.append(node("span", "skill-title", title), node("span", "skill-die", sbsI18n("swade-hud.UI.d42_273b8b713a")));
+      row.append(name);
+      section.append(row);
+      list.append(section);
     }
   }
   setSkillActionsExpanded(section, expanded) {
@@ -810,18 +879,18 @@ export class SwadeHUD {
       if (key === "natural-healing" && naturalHealingCooldown(this.actor)) {
         control.classList.add("disabled");
         control.setAttribute("aria-disabled", "true");
-        control.title = "Natural Healing is on cooldown";
+        control.title = sbsI18n("swade-hud.UI.NaturalHealingisoncooldown_14e59d7bbf");
       }
       if (key === "hold") {
         const held = Boolean(holdCombatant(this.actor, this.token?.document)?.roundHeld);
         control.setAttribute("aria-pressed", String(held));
-        control.title = held ? "Left-click: Act Now · Right-click: Act After Current Combatant" : "Hold on this combatant’s turn";
+        control.title = held ? sbsI18n("swade-hud.UI.LeftclickActNowRightclick_7b8ae2e472") : sbsI18n("swade-hud.UI.Holdonthiscombatantsturn_c61449ed9a");
       }
       list.append(row);
     }
   }
   featureSidebar(list) {
-    for (const [type, title] of [["ancestry", "Ancestry"], ["edge", "Edges"], ["hindrance", "Hindrances"], ["ability", "Special Abilities"]]) {
+    for (const [type, title] of [["ancestry", sbsI18n("swade-hud.UI.Ancestry_65a0468287")], ["edge", sbsI18n("swade-hud.UI.Edges_658b158af9")], ["hindrance", sbsI18n("swade-hud.UI.Hindrances_6276d146ad")], ["ability", sbsI18n("swade-hud.UI.SpecialAbilities_baea04bd44")]]) {
       const items = sorted(itemsOf(this.actor, type));
       if (!items.length) continue;
       header(list, title);
@@ -831,7 +900,7 @@ export class SwadeHUD {
         this.itemName(row, item);
       }
     }
-    if (!list.childElementCount) list.append(node("p", "empty", "No Edges or Hindrances"));
+    if (!list.childElementCount) list.append(node("p", "empty", sbsI18n("swade-hud.UI.NoEdgesorHindrances_60557964f6")));
   }
   inventorySidebar(list) {
     const actor = this.actor;
@@ -851,7 +920,7 @@ export class SwadeHUD {
       bulk.append(meter);
       list.append(bulk);
     }
-    for (const [types, title] of [[["weapon", "shield"], "Weapons & Shields"], [["armor"], "Armor"], [["gear"], "Equipment"], [["consumable"], "Consumables"]]) {
+    for (const [types, title] of [[["weapon", "shield"], sbsI18n("swade-hud.UI.WeaponsShields_1775a3ab1b")], [["armor"], sbsI18n("swade-hud.UI.Armor_a592855d05")], [["gear"], sbsI18n("swade-hud.UI.Equipment_7f2465ac7c")], [["consumable"], sbsI18n("swade-hud.UI.Consumables_7cb53ac085")]]) {
       const items = sorted(itemsOf(actor, ...types));
       if (!items.length) continue;
       header(list, title);
@@ -872,28 +941,28 @@ export class SwadeHUD {
     stats.append(quantity, weight);
     const controls = node("div", "item-controls");
     if (item.type === "consumable" || item.system.actions?.trait) {
-      link(controls, item.type === "consumable" ? "consume" : "item-action", "fa-play", "", "Use item",
+      link(controls, item.type === "consumable" ? "consume" : "item-action", "fa-play", "", sbsI18n("swade-hud.UI.Useitem_1e14a7f3be"),
         { itemId: item.id, itemAction: "formula" });
     }
     if ("equipStatus" in item.system) {
-      const equip = link(controls, "equip", "fa-shirt", "", "Toggle equipped / carried", { itemId: item.id });
+      const equip = link(controls, "equip", "fa-shirt", "", sbsI18n("swade-hud.UI.Toggleequippedcarried_74aea1cdf8"), { itemId: item.id });
       equip.className = "item-carry-type worn" + (item.system.equipStatus >= 2 ? " active" : "");
     }
-    link(controls, "item-description", "fa-circle-question", "", "Item description", { itemId: item.id });
-    link(controls, "edit-item", "fa-pen-to-square", "", "Edit item", { itemId: item.id });
-    link(controls, "delete-item", "fa-trash", "", "Delete item", { itemId: item.id }).className = "delete";
+    link(controls, "item-description", "fa-circle-question", "", sbsI18n("swade-hud.UI.Itemdescription_89ed70057c"), { itemId: item.id });
+    link(controls, "edit-item", "fa-pen-to-square", "", sbsI18n("swade-hud.UI.Edititem_9f84eeebf8"), { itemId: item.id });
+    link(controls, "delete-item", "fa-trash", "", sbsI18n("swade-hud.UI.Deleteitem_a12c385440"), { itemId: item.id }).className = "delete";
     extras.append(stats, controls);
     details.append(extras);
     row.append(details);
   }
   powerSidebar(list) {
     if (this.owned && game.modules.get("swade-better-powers")?.api?.openPowerTimers) {
-      link(header(list, "").firstElementChild, "power-timers", "fa-hourglass-half", "Power Timers", "Power Timers");
+      link(header(list, "").firstElementChild, "power-timers", "fa-hourglass-half", sbsI18n("swade-hud.UI.PowerTimers_967db5e745"), sbsI18n("swade-hud.UI.PowerTimers_967db5e745"));
     }
     const powers = sorted(itemsOf(this.actor, "power"));
     const groups = Map.groupBy(powers, (item) => item.system.arcane || "general");
     for (const [key, items] of groups) {
-      const title = header(list, key === "general" ? "Powers" : key);
+      const title = header(list, key === "general" ? sbsI18n("swade-hud.UI.Powers_3286cc91e5") : key);
       const pool = this.actor.system.powerPoints?.[key];
       if (pool && !powerPoolUsesNoPP(this.actor, key)) {
         const controls = node("div", "controls power-pool");
@@ -916,7 +985,7 @@ export class SwadeHUD {
         if (!isTemplateRange(item.system.range) || !templates.length) {
           const distance = node("span", "power-distance");
           distance.append(icon("fa-ruler"), node("span", "", item.system.range || "—"));
-          distance.title = "Range";
+          distance.title = sbsI18n("swade-hud.UI.Range_5de74a81b1");
           category.append(distance);
         }
         templates.forEach((template, index) => {
@@ -929,43 +998,43 @@ export class SwadeHUD {
         const cost = node("span", "pp-cost", presentation.text);
         cost.title = presentation.title;
         actions.append(cost);
-        link(actions, "item-action", "fa-play", "", "Cast power", { itemId: item.id, itemAction: "formula" }).className = "cast";
+        link(actions, "item-action", "fa-play", "", sbsI18n("swade-hud.UI.Castpower_eb8ed5b2f2"), { itemId: item.id, itemAction: "formula" }).className = "cast";
         extras.append(category, actions);
         details.append(extras);
         row.append(details);
         this.actionVariants(list, item, { baseDamage: true });
       }
     }
-    if (!powers.length) list.append(node("p", "empty", "No powers"));
+    if (!powers.length) list.append(node("p", "empty", sbsI18n("swade-hud.UI.Nopowers_901a19c71a")));
   }
   extrasSidebar(list) {
     list.classList.add("effects-columns");
     const favorites = new Set(this.profile.effectFavorites ?? []);
     const actorColumn = node("section", "effect-column actor-effect-list");
-    header(actorColumn, "Actor Effects");
+    header(actorColumn, sbsI18n("swade-hud.UI.ActorEffects_3ca787fbee"));
     const effects = nonSystemEffects(this.actor);
     const starred = effects.filter((effect) => favorites.has("effect:" + effect.uuid));
     const remaining = effects.filter((effect) => !favorites.has("effect:" + effect.uuid));
     const temporary = effect => Boolean(effect.flags?.[MODULE_ID]?.support)
       || (effect.isTemporary ?? Number.isFinite(effect.duration?.value));
-    for (const [label, entries] of [["Starred", starred], ["Temporary Effects", remaining.filter(temporary)],
-      ["Permanent Effects", remaining.filter((effect) => !temporary(effect))]]) {
+    for (const [label, entries] of [[sbsI18n("swade-hud.UI.Starred_07a2d579c3"), starred], [sbsI18n("swade-hud.UI.TemporaryEffects_fb4833a441"), remaining.filter(temporary)],
+      [sbsI18n("swade-hud.UI.PermanentEffects_2f38cd5b6d"), remaining.filter((effect) => !temporary(effect))]]) {
       if (!entries.length) continue;
       const group = node("div", "effect-group");
       group.append(node("h3", "effect-group-title", label));
       for (const effect of entries) {
         const active = effect.active !== false && !effect.disabled;
         const source = effect.parent?.documentName === "Item" ? effect.parent.name : "";
-        const detail = [active ? "" : "Disabled", temporary(effect) ? effectDuration(effect).label : "Permanent", source]
+        const detail = [active ? "" : sbsI18n("swade-hud.UI.Disabled_75081b593d"), temporary(effect) ? effectDuration(effect).label : sbsI18n("swade-hud.UI.Permanent_455a95491f"), source]
           .filter(Boolean).join(" · ");
         this.effectListRow(group, { name: effect.name, img: effect.img, active, detail,
           action: "effect-toggle", data: { effectUuid: effect.uuid }, favoriteKey: "effect:" + effect.uuid, favorites });
       }
       actorColumn.append(group);
     }
-    if (!effects.length) actorColumn.append(node("p", "empty", "No actor effects"));
+    if (!effects.length) actorColumn.append(node("p", "empty", sbsI18n("swade-hud.UI.Noactoreffects_743c546daa")));
     const systemColumn = node("section", "effect-column system-effect-list");
-    header(systemColumn, "System Effects");
+    header(systemColumn, sbsI18n("swade-hud.UI.SystemEffects_29098b9904"));
     const statuses = node("div", "status-list");
     const definitions = [...statusDefinitions()].sort((a, b) => Number(favorites.has("status:" + b.id))
       - Number(favorites.has("status:" + a.id)) || localize(a.name).localeCompare(localize(b.name)));
@@ -982,7 +1051,7 @@ export class SwadeHUD {
     Object.assign(row.dataset, data);
     row.dataset.filterValue = name.toLocaleLowerCase();
     const control = link(row, action, "", "", name + " · Left-click: toggle"
-      + (action === "status" ? " · Shift+Left-click: apply for a duration" : "")
+      + (action === "status" ? sbsI18n("swade-hud.UI.ShiftLeftclickapplyfora_8836bb0e76") : "")
       + " · Right-click: Edit / Delete · Shift+Right-click: description", data);
     control.className = "effect-toggle";
     control.setAttribute("aria-pressed", String(active));
@@ -1002,7 +1071,7 @@ export class SwadeHUD {
       this.showEffectDescription(row).catch((error) => this.report(error));
     }, true);
     const starred = favorites.has(favoriteKey);
-    const star = link(row, "effect-favorite", "fa-star", "", (starred ? "Unstar " : "Star ") + name, { favoriteKey });
+    const star = link(row, "effect-favorite", "fa-star", "", (starred ? sbsI18n("swade-hud.UI.Unstar_053662946a") : sbsI18n("swade-hud.UI.Star_0bb8478a5e")) + name, { favoriteKey });
     star.className = "effect-star" + (starred ? " starred" : "");
     star.setAttribute("aria-pressed", String(starred));
     if (!starred) star.firstChild.className = "fa-regular fa-star";
@@ -1012,9 +1081,9 @@ export class SwadeHUD {
   bindEffectContextMenu(sidebar) {
     const ContextMenu = foundry.applications.ux.ContextMenu.implementation;
     this.sidebarContextMenu = new ContextMenu(sidebar, ".effect-row", [
-      { label: "Edit", icon: "fa-solid fa-pen-to-square", visible: () => this.owned,
+      { label: sbsI18n("swade-hud.UI.Edit_464c4ffd01"), icon: "fa-solid fa-pen-to-square", visible: () => this.owned,
         onClick: (_event, row) => this.onEffectContextAction(row, "edit").catch((error) => this.report(error)) },
-      { label: "Delete", icon: "fa-solid fa-trash", visible: (row) => this.owned && Boolean(this.effectForRow(row)),
+      { label: sbsI18n("swade-hud.UI.Delete_e2d0a54968"), icon: "fa-solid fa-trash", visible: (row) => this.owned && Boolean(this.effectForRow(row)),
         onClick: (_event, row) => this.onEffectContextAction(row, "delete").catch((error) => this.report(error)) },
     ], { jQuery: false, fixed: true, classes: ["swade-hud-effect-context"] });
   }
@@ -1030,9 +1099,9 @@ export class SwadeHUD {
       } catch (error) { this.report(error); }
     };
     this.sidebarContextMenu = new ContextMenu(sidebar, ITEM_CONTEXT_TARGET, [
-      { label: "Edit", icon: "fa-solid fa-pen-to-square", visible,
+      { label: sbsI18n("swade-hud.UI.Edit_464c4ffd01"), icon: "fa-solid fa-pen-to-square", visible,
         onClick: select((item) => item.sheet.render({ force: true })) },
-      { label: "Delete", icon: "fa-solid fa-trash", visible,
+      { label: sbsI18n("swade-hud.UI.Delete_e2d0a54968"), icon: "fa-solid fa-trash", visible,
         onClick: select((item) => item.deleteDialog()) },
     ], { jQuery: false, fixed: true, classes: ["swade-hud-item-context"] });
   }
@@ -1201,7 +1270,7 @@ export class SwadeHUD {
       case "shortcut": return this.useShortcut(Number(data.slot), event);
       case "recover-shaken": return recoverShaken(this.actor);
       case "soak": return rollAttribute(this.actor, "vigor", {
-        additionalMods: [{ label: "Soak bonus", value: this.actor.system.attributes.vigor.soakBonus ?? 0 }],
+        additionalMods: [{ label: sbsI18n("swade-hud.UI.Soakbonus_b8f7a18e3a"), value: this.actor.system.attributes.vigor.soakBonus ?? 0 }],
       });
       case "macro": return fromUuidSync(data.macroUuid)?.execute({ actor: this.actor, token: this.token });
       case "edit-macro": return fromUuidSync(data.macroUuid)?.sheet.render({ force: true });
@@ -1297,17 +1366,18 @@ export class SwadeHUD {
     const doc = fromUuidSync(shortcut.uuid);
     if (doc?.documentName === "Macro") return doc.execute({ actor: this.actor, token: this.token });
     if (!doc || doc.parent?.uuid !== this.actor.uuid) return;
-    if (doc.type === "skill") return rollSkill(this.actor, doc.id);
-    if (doc.type === "consumable") return doc.consume();
-    const actions = itemShortcutActions(this.actor, doc);
-    if (!actionKind(doc) && hasSwadeToolsItemDialog(doc) && (["weapon", "power"].includes(doc.type) || actions.length)) {
+    const usable = doc.type === "consumable";
+    if (usable && !game.modules.get("swade-better-usables")?.api?.getShortcutControls) return doc.consume();
+    const skill = doc.type === "skill";
+    const actions = skill || usable ? [] : itemShortcutActions(this.actor, doc);
+    if (!skill && !usable && !actionKind(doc) && hasSwadeToolsItemDialog(doc) && (["weapon", "power"].includes(doc.type) || actions.length)) {
       this.closeDescription();
       if (doc.type === "weapon" && attackOptions(this.actor).some(option => attackOptionState(this.actor, option.id))) {
         return useItem(this.actor, doc, "formula", event);
       }
       return openSwadeToolsItemDialog(this.actor, doc, { castCard: doc.type === "power" });
     }
-    if (doc.type === "weapon" || doc.type === "power" || actions.length > 1) {
+    if (usable || skill || doc.type === "weapon" || doc.type === "power" || actions.length > 1) {
       if (this.description?.shortcutItemUuid === doc.uuid && this.description.element?.isConnected) {
         this.closeDescription();
         return;
@@ -1440,6 +1510,7 @@ export class SwadeHUD {
     this.description = popup;
     await popup.render({ force: true });
     if (this.description !== popup) { popup.close({ animate: false }); return; }
+    if (popup.shortcutItemUuid) raiseHudPanel(popup.element);
     popup.positionAtShortcut?.();
   }
   closeDescription() { this.description?.close({ animate: false }); this.description = null; }
@@ -1451,8 +1522,10 @@ export class SwadeHUD {
     const heading = node("div", "header");
     const image = node("div", "image");
     image.style.backgroundImage = "url(" + JSON.stringify(info.img) + ")";
-    heading.append(image, node("div", "title", info.name),
-      node("div", "subtitle", info.doc ? localize("TYPES.Item." + info.doc.type, info.doc.type || "Macro") : "Attribute"));
+    const title = node("div", "title", info.name);
+    styleTier(info.doc, {icon: image, name: title});
+    heading.append(image, title,
+      node("div", "subtitle", info.doc ? localize("TYPES.Item." + info.doc.type, info.doc.type || "Macro") : sbsI18n("swade-hud.UI.Attribute_1d289028b7")));
     content.append(heading);
     if (info.count !== null && info.count !== undefined) content.append(node("div", "details left", "Available: " + info.count));
     if (info.cost !== null && info.cost !== undefined) content.append(node("div", "details right", info.cost + " PP"));

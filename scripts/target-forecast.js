@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { toolsTargetDefense } from "./tools-forecast.js";
 
 const SBE = "swade-better-effects";
@@ -17,7 +18,7 @@ export function attackKind(item, skill) {
 }
 export function incomingModifiers(actor, kind, token) {
   const mods = actor?.system.stats?.globalMods;
-  const result = ["targetAttack", kind === "ranged" ? "targetAttackRanged" : "targetAttackMelee"]
+  const result = [sbsI18n("swade-hud.UI.targetAttack_c5d6dea11e"), kind === "ranged" ? sbsI18n("swade-hud.UI.targetAttackRanged_9746a5c459") : sbsI18n("swade-hud.UI.targetAttackMelee_6dd7303d1e")]
     .flatMap((key) => mods?.[key] ?? []).map((mod) => ({ label: mod.label, value: finite(mod.value) }));
   if (token?.document?.hasStatusEffect?.("vulnerable") || actor?.statuses?.has("vulnerable") || actor?.system.status?.isVulnerable)
     result.push({ label: "SWADE.TargetVulnerable", value: 2 });
@@ -38,7 +39,7 @@ function effectContext(api, forecast, saved) {
   const { actor, item, skill } = forecast;
   const tokens = actor?.getActiveTokens?.(false, true) ?? [];
   const source = actor?.token ?? tokens.find((token) => token.object?.controlled) ?? tokens[0];
-  const attacker = api.normalizeFlags([...api.getFlags(actor), ...api.getFlags(source)]);
+  const attacker = api.normalizeFlags([...api.getFlags(actor, source), ...api.getFlags(source)]);
   const itemFlags = api.getFlags(item);
   const attribute = forecast.attribute ?? skill?.system.attribute;
   return { ...saved, version: 1, hasRoll: true, rollType: "trait", attribute,
@@ -103,7 +104,7 @@ export async function targetedForecasts(forecast, snapshot, targets = [...(game.
     return { ...forecast, formula: forecast.formula + (ownValue - removed ? "+(" + (ownValue - removed) + ")" : ""),
       target: base - adjustment, targetKey: target.document?.uuid ?? target.id ?? target.name,
       targetName: target.name ?? target.actor.name, revealDefense,
-      defense: revealDefense ? kind === "melee" ? "Parry" : "Ranged" : undefined,
+      defense: revealDefense ? kind === "melee" ? sbsI18n("swade-hud.UI.Parry_e5567f841f") : sbsI18n("swade-hud.UI.Ranged_3f0b51a249") : undefined,
       defenseDetails: revealDefense ? modifiers.map((mod) => label(mod.label) + " " + (mod.value > 0 ? "+" : "") + mod.value).join(" · ") : undefined };
   }));
 }

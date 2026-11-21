@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { SwadeHUD } from "./hud.js";
 import { MODULE_ID, useItem } from "./swade.js";
 import { initializePrototypeSize, onActorSizeChange, onSizeEffectChange, preparePrototypeSizeUpdate } from "./scale.js";
@@ -10,13 +11,18 @@ import { installToolsDialogOverride } from "./tools-dialogs.js";
 import { decoratePowerCastMessage, renderPowerCastCard, trackPowerCastDialog } from "./power-chat.js";
 import { patchTargetedDamageDialog } from "./targeted-damage.js";
 import { decorateWeaponMessage, renderWeaponMessage } from "./attack-options.js";
-import { adjustChaseAttackModifiers, renderTestRaiseNote } from "./basic-actions.js";
+import { adjustChaseAttackModifiers, registerTestQuery, renderTestRaiseNote } from "./basic-actions.js";
 import { registerMountedStatus } from "./effects.js";
 import { consumeSupport, installToolsSupport, markSupportRoll, registerSupportQuery } from "./support.js";
 import { renderGrappleCard } from "./grapple-chat.js";
 
 const hud = new SwadeHUD();
-const distance = new DistanceOverlay(() => hud.resolveToken(), () => game.settings.get(MODULE_ID, "tokenDistance"));
+let advancedTargeting = false;
+const distance = new DistanceOverlay(() => hud.resolveToken(), () => !advancedTargeting && game.settings.get(MODULE_ID, "tokenDistance"));
+Hooks.on("sbsAdvancedTargeting", active => {
+  advancedTargeting = active;
+  distance.refresh();
+});
 const insights = new RollInsights();
 insights.start();
 hud.refreshFeatures = () => { distance.refresh(); insights.refresh(); };
@@ -51,6 +57,7 @@ Hooks.on("deleteActiveEffect", (effect, _options, userId) => syncSizeEffect(effe
 Hooks.once("init", () => {
   registerSettings();
   registerSupportQuery();
+  registerTestQuery();
   game.modules.get(MODULE_ID).api = hud;
 });
 Hooks.once("setup", registerMountedStatus);
@@ -67,15 +74,17 @@ Hooks.on("controlToken", (token, controlled) => {
   if (controlled) hud.rememberToken(token);
   hud.schedule();
 });
-for (const hook of ["canvasReady", "renderHotbar", "createToken", "deleteToken", "updateToken",
-  "updateWorldTime", "updateCombat", "deleteCombat", "updateCombatant", "deleteCombatant"]) Hooks.on(hook, () => hud.schedule());
+for (const hook of [sbsI18n("swade-hud.UI.canvasReady_e014fae8cf"), sbsI18n("swade-hud.UI.renderHotbar_432801825d"), sbsI18n("swade-hud.UI.createToken_eb21103a1f"), sbsI18n("swade-hud.UI.deleteToken_816f3e587e"), sbsI18n("swade-hud.UI.updateToken_0a526b9437"),
+  sbsI18n("swade-hud.UI.updateWorldTime_35272cec51"), sbsI18n("swade-hud.UI.updateCombat_b113e210aa"), sbsI18n("swade-hud.UI.deleteCombat_d0b7e5bed9"), sbsI18n("swade-hud.UI.updateCombatant_37669944be"), sbsI18n("swade-hud.UI.deleteCombatant_13413e86f0")]) Hooks.on(hook, () => hud.schedule());
 Hooks.on("canvasTearDown", () => { hud.forgetToken(); hud.hide(); });
-for (const hook of ["updateActor", "deleteActor",
-  "createItem", "updateItem", "deleteItem", "createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {
+for (const hook of [sbsI18n("swade-hud.UI.updateActor_688e2852e2"), sbsI18n("swade-hud.UI.deleteActor_703cc9c936"),
+  sbsI18n("swade-hud.UI.createItem_2be87307d5"), sbsI18n("swade-hud.UI.updateItem_fc765ef48a"), sbsI18n("swade-hud.UI.deleteItem_0259ed622a"), sbsI18n("swade-hud.UI.createActiveEffect_4607bdbb60"), sbsI18n("swade-hud.UI.updateActiveEffect_5ddfac034c"), sbsI18n("swade-hud.UI.deleteActiveEffect_1194b28b56")]) {
   Hooks.on(hook, (document, changed) => {
     const actor = document.documentName === "Actor" ? document
       : document.actor ?? document.parent?.actor ?? document.parent;
-    if (actor?.uuid === hud.actor?.uuid || actor?.uuid === hud.effectPanels.actor?.uuid || changed?.ownership) hud.schedule();
+    const item = document.documentName === "ActiveEffect" && document.parent?.documentName === "Item" ? document.parent : null;
+    const shortcut = item && hud.actor && hud.shortcuts().some(entry => entry?.uuid === item.uuid);
+    if (actor?.uuid === hud.actor?.uuid || actor?.uuid === hud.effectPanels.actor?.uuid || changed?.ownership || shortcut) hud.schedule();
   });
 }
 Hooks.on("updateUser", (user, changed) => {

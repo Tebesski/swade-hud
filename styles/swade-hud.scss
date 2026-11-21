@@ -114,6 +114,30 @@
   padding-bottom: var(--swade-hud-players-space, 0px);
   #scene-controls { overflow-y: auto; }
 }
+.swade-hud-element .swade-hud-coatings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+
+  > img {
+    display: block;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    object-fit: contain;
+    border: 0;
+    border-radius: 2px;
+    background: rgb(0 0 0 / 65%);
+  }
+}
+#swade-hud-persistent .shortcut > .swade-hud-coatings {
+  top: 1px;
+  right: 1px;
+  max-width: calc(100% - 2px);
+  justify-content: flex-end;
+  > img { width: 12px; height: 12px; pointer-events: none; }
+}
 #swade-hud-sidebar {
   z-index: calc(var(--z-index-app, 30) + 1);
   transform-origin: top left;
@@ -127,6 +151,7 @@
     gap: 0.35em;
     .image { height: var(--action-image-height); margin: 0; }
     > a:not(.image) { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+    .swade-hud-coatings { margin-left: auto; }
   }
   .item.attack .variants { width: 100%; }
   .item.action .name, .item.feat .name { white-space: nowrap; }
@@ -139,6 +164,7 @@
   [data-action="generate-actions"] { display: flex; gap: 0.4em; align-items: center; padding: 0.35em; }
   .action-star.starred { color: #eac574; }
   .skill-section { margin-bottom: 0.45em; }
+  .unskilled-attempt { column-span: all; }
   .item.skill-heading {
     display: flex;
     justify-content: flex-start;

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
+import { existsSync } from "node:fs";
 import { withToolsChatCard, decorateToolsChatMessage, guardToolsAttackTargets } from "../scripts/tools-chat.js";
 import { grappleOutcome } from "../scripts/grapple-chat.js";
 
@@ -15,11 +16,13 @@ describe("native SWADE dialogs with Tools chat automation",()=>{
     actor={id:"actor",uuid:"Actor.actor",isToken:true,token:{id:"token"}};
     item={id:"weapon",uuid:actor.uuid+".Item.weapon"};
     globalThis.game={modules:new Map([["swade-tools",{active:true}]]),user:{id:"user",targets:new Set([{id:"target"}])}};
+    game.i18n = {localize: value => value};
   });
   function message(roll){
     const result={rolls:[structuredClone(roll)],flags:{other:{retained:true}},updateSource(data){
       if (data["flags.swade-tools"]) this.tools=data["flags.swade-tools"];
       if (data["flags.swade-hud.grapple"]) this.grapple=data["flags.swade-hud.grapple"];
+      if (data["flags.swade-hud.nativeAttack"]) this.nativeAttack=data["flags.swade-hud.nativeAttack"];
     }};
     decorateToolsChatMessage(result,{}, {},"user");return result;
   }
@@ -127,5 +130,55 @@ describe("native SWADE dialogs with Tools chat automation",()=>{
     card.item = {type: "action", system: {actions: {additional: {crush: {type: "damage", override: "@str"}}}}};
     card.chat.flags["swade-tools"].damageaction = "crush";
     assert.equal(card.attackTarget("target"), "target");
+  });
+  for (const disabled of [false, true]) it("counts native range/cover/scale bonuses once with modifiers " + (disabled ? "disabled" : "enabled"), async () => {
+    const mods = [], defaults = [{label: "Range", value: -4}, {label: "Cover", value: -2},
+      {label: "Scale", value: 2}, {label: "Vulnerable", value: 2}];
+    const reference = {id: "reference", actor: {system: {stats: {parry: {value: 7}}}}};
+    const near = {id: "near", actor: {system: {stats: {parry: {value: 5}}}}};
+    game.user.targets = new Set([reference, near]);
+    game.swade = {util: {getDefaultAttackModifiers: () => ({additionalMods: [], bestNonStackingMods: {}})}};
+    let chat;
+    await withToolsChatCard({actor, item, action: "formula", mods}, async () => {
+      Hooks.call("swadeCalculateDefaultAttackMods", null, reference, {}, item, true, false, defaults, {});
+      const roll = {terms: [{options: {}}]};
+      Hooks.call("swadePreRollSkill", actor, {name: "Athletics"}, roll, defaults, {additionalMods: mods});
+      // These flags are changed on confirmation, after the pre-roll hook.
+      if (disabled) for (const mod of defaults) mod.ignore = true;
+      chat = message(roll);
+    });
+    assert.equal(chat.nativeAttack.targets.reference.targetNumber, 4);
+    assert.equal(chat.nativeAttack.targets.near.targetNumber, disabled ? 4 : 2);
+    assert.equal(listeners.size, 0);
+    // A frozen card remains valid after its temporary roll context is released.
+    assert.equal(chat.nativeAttack.version, 1);
+  });
+  it("native melee attacks use each defender's Parry without adding its modifier twice", async () => {
+    const mods = [], target = {id: "target", actor: {system: {stats: {parry: {value: 7, modifier: 2}}}}};
+    game.user.targets = new Set([target]);
+    game.swade = {util: {getDefaultAttackModifiers: () => ({additionalMods: []})}};
+    await withToolsChatCard({actor, item, action: "formula", mods}, async () => {
+      Hooks.call("swadeCalculateDefaultAttackMods", null, target, {}, item, false, true, [], {});
+      const roll = {terms: [{options: {}}]};
+      Hooks.call("swadePreRollSkill", actor, {name: "Fighting"}, roll, [], {additionalMods: mods});
+      assert.equal(message(roll).nativeAttack.targets.target.targetNumber, 7);
+    });
+  });
+  it("Tools reports 9 - 4 as a hit and preserves clickable damage and raises", {
+    skip: !existsSync(new URL("../../swade-tools/scripts/class/RollControl.js", import.meta.url)),
+  }, async () => {
+    const {default: RollControl} = await import("../../swade-tools/scripts/class/RollControl.js");
+    const target = {id: "target", name: "Defender", actor: {}};
+    const weapon = {type: "weapon", system: {damage: "2d6", range: "3/6/12"}};
+    const chat = {rolls: [{total: 5}], flags: {"swade-tools": {itemroll: "weapon"},
+      "swade-hud": {nativeAttack: {version: 1, targets: {target: {targetNumber: 4}}}}}};
+    const control = new RollControl(chat, null, null);
+    control.getItemOwner = () => ({items: new Map([["weapon", weapon]])});
+    for (const [total, outcome] of [[5, "hit"], [3, "miss"], [8, "raise"]]) {
+      control.attackTarget(target, total, 1);
+      assert.match(control.targetPrint.at(-1).print, new RegExp("swadetools-term-" + outcome));
+      if (outcome !== "miss") assert.match(control.targetPrint.at(-1).print, /swadetools-rolldamage/);
+    }
+    assert.equal(typeof control.targetFunction, "function");
   });
 });

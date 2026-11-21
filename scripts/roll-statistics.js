@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 // Pure probability calculations. Never evaluates a Foundry Roll, calls its RNG,
 // spends resources, or executes formula text as JavaScript.
 const EPSILON = 1e-12;
@@ -21,11 +22,11 @@ export function parseFormula(input) {
   function primary() {
     if (read(/^\+/)) return primary();
     if (read(/^-/)) return { kind: "binary", op: "*", left: { kind: "number", value: -1 }, right: primary() };
-    if (read(/^\(/)) { const node = expression(); if (!read(/^\)/)) throw Error("Unclosed parenthesis"); return node; }
+    if (read(/^\(/)) { const node = expression(); if (!read(/^\)/)) throw Error(sbsI18n("swade-hud.UI.Unclosedparenthesis_0572ce1ed5")); return node; }
     if (read(/^\{/)) {
       const rolls = [expression()];
       while (read(/^,/)) rolls.push(expression());
-      if (!read(/^\}/)) throw Error("Unclosed dice pool");
+      if (!read(/^\}/)) throw Error(sbsI18n("swade-hud.UI.Uncloseddicepool_a378ad4791"));
       return { kind: "pool", rolls, modifiers: modifiers() };
     }
     const die = read(/^(\d*)d(w\d*|\d+|f|c)/i);
@@ -33,7 +34,7 @@ export function parseFormula(input) {
       const denomination = die[2].toLowerCase();
       const faces = denomination[0] === "w" ? Number(denomination.slice(1) || 6) : denomination === "f" ? 3 : denomination === "c" ? 2 : Number(denomination);
       const number = Number(die[1] || 1);
-      if (number < 1 || number > 100 || faces < 1 || faces > 1000) throw Error("Dice exceed analysis limits");
+      if (number < 1 || number > 100 || faces < 1 || faces > 1000) throw Error(sbsI18n("swade-hud.UI.Diceexceedanalysislimits_95960f01f4"));
       return { kind: "die", id: ++serial, number, faces, wild: denomination[0] === "w", fate: denomination === "f", coin: denomination === "c", modifiers: modifiers() };
     }
     const number = read(/^(?:\d+(?:\.\d*)?|\.\d+)/);
@@ -42,10 +43,10 @@ export function parseFormula(input) {
     if (fn) {
       const args = [expression()];
       while (read(/^,/)) args.push(expression());
-      if (!read(/^\)/)) throw Error("Unclosed function");
+      if (!read(/^\)/)) throw Error(sbsI18n("swade-hud.UI.Unclosedfunction_9ea72acdc1"));
       return { kind: "function", name: fn[1].toLowerCase(), args };
     }
-    throw Error("Unsupported formula term");
+    throw Error(sbsI18n("swade-hud.UI.Unsupportedformulaterm_8eb05c8844"));
   }
   function expression(minimum = 0) {
     let left = primary();
@@ -59,9 +60,9 @@ export function parseFormula(input) {
     }
     return left;
   }
-  if (!text || text.length > 1500) throw Error("Invalid formula length");
+  if (!text || text.length > 1500) throw Error(sbsI18n("swade-hud.UI.Invalidformulalength_dfd9f1a477"));
   const root = expression();
-  if (cursor !== text.length) throw Error("Unsupported dice modifier or formula");
+  if (cursor !== text.length) throw Error(sbsI18n("swade-hud.UI.Unsupporteddicemodifierorformula_32327995d1"));
   return root;
 }
 
@@ -73,15 +74,15 @@ function operation(op, a, b) {
 }
 function calculate(root, forced = new Map()) {
   let work = 0;
-  const spend = () => { if (++work > MAX_WORK) throw Error("Formula exceeds exact analysis limits"); };
+  const spend = () => { if (++work > MAX_WORK) throw Error(sbsI18n("swade-hud.UI.Formulaexceedsexactanalysislimits_03e2ca0942")); };
   const combine = (a, b, fn) => {
     const result = new Map();
-    for (const [x, px] of a) for (const [y, py] of b) { spend(); const value = fn(x, y); if (!Number.isFinite(value)) throw Error("Non-finite arithmetic"); add(result, value, px * py); }
+    for (const [x, px] of a) for (const [y, py] of b) { spend(); const value = fn(x, y); if (!Number.isFinite(value)) throw Error(sbsI18n("swade-hud.UI.Nonfinitearithmetic_6126e807a0")); add(result, value, px * py); }
     return result;
   };
   const select = (maps, mods) => {
     if (!mods.length) return maps.reduce((sum, map) => combine(sum, map, (a, b) => a + b), point(0));
-    if (mods.length !== 1 || !["kh", "kl", "dh", "dl"].includes(mods[0].kind)) throw Error("Unsupported pool modifier");
+    if (mods.length !== 1 || !["kh", "kl", "dh", "dl"].includes(mods[0].kind)) throw Error(sbsI18n("swade-hud.UI.Unsupportedpoolmodifier_4d1446bac9"));
     const mod = mods[0], count = mod.value ?? 1;
     const keep = mod.kind[0] === "d" ? Math.max(0, maps.length - count) : Math.min(count, maps.length);
     const high = ["kh", "dl"].includes(mod.kind);
@@ -119,21 +120,21 @@ function calculate(root, forced = new Map()) {
     if (node.kind === "pool") return select(node.rolls.map(evaluate), node.modifiers);
     if (node.kind === "function") {
       if (["min", "max"].includes(node.name)) return node.args.map(evaluate).reduce((a, b) => combine(a, b, Math[node.name]));
-      if (node.args.length !== 1) throw Error("Unsupported function arguments");
+      if (node.args.length !== 1) throw Error(sbsI18n("swade-hud.UI.Unsupportedfunctionarguments_f8b665c158"));
       const result = new Map(); for (const [value, p] of evaluate(node.args[0])) add(result, Math[node.name](value), p); return result;
     }
     const die = new Map(), mods = node.modifiers;
     const explosion = mods.find((mod) => ["x", "xo"].includes(mod.kind)) ?? (node.wild ? { kind: "x" } : null);
     const reroll = mods.find((mod) => ["r", "ro"].includes(mod.kind));
-    if (mods.some((mod) => !["x", "xo", "r", "ro", "kh", "kl", "dh", "dl", "min", "max", "cs", "cf"].includes(mod.kind))) throw Error("Unsupported die modifier");
+    if (mods.some((mod) => !["x", "xo", "r", "ro", "kh", "kl", "dh", "dl", "min", "max", "cs", "cf"].includes(mod.kind))) throw Error(sbsI18n("swade-hud.UI.Unsupporteddiemodifier_5cdc291120"));
     const faces = Array.from({ length: node.faces }, (_, i) => node.fate ? i - 1 : node.coin ? i : i + 1);
     const rollsAgain = (value) => reroll && compare(value, reroll.comparison, reroll.value ?? 1);
     const rerolled = faces.filter(rollsAgain).length / node.faces;
-    if (rerolled === 1 && reroll?.kind === "r") throw Error("Infinite reroll");
+    if (rerolled === 1 && reroll?.kind === "r") throw Error(sbsI18n("swade-hud.UI.Infinitereroll_02e063a29e"));
     const faceProbability = (value) => reroll ? reroll.kind === "r" ? (rollsAgain(value) ? 0 : 1 / node.faces / (1 - rerolled))
       : (rollsAgain(value) ? 0 : 1 / node.faces) + rerolled / node.faces : 1 / node.faces;
     const explode = (value) => explosion && compare(value, explosion.comparison, explosion.value ?? faces.at(-1));
-    if (explosion && faces.every(explode)) throw Error("Unbounded non-terminating explosion");
+    if (explosion && faces.every(explode)) throw Error(sbsI18n("swade-hud.UI.Unboundednonterminatingexplosion_d470802f79"));
     let frontier = point(0);
     for (let level = 0; frontier.size && level < 80; level++) {
       const next = new Map();
@@ -191,7 +192,7 @@ function sampledDistribution(root, formula) {
       let value, repeats = 0;
       do {
         value = Math.floor(random() * node.faces) + (node.fate ? -1 : node.coin ? 0 : 1);
-        if (++repeats > 1000) throw Error("Non-terminating die");
+        if (++repeats > 1000) throw Error(sbsI18n("swade-hud.UI.Nonterminatingdie_03abf8f8cf"));
       } while (reroll && compare(value, reroll.comparison, reroll.value ?? 1) && (reroll.kind === "r" || repeats === 1));
       return value;
     };
@@ -200,7 +201,7 @@ function sampledDistribution(root, formula) {
       let value = 0, next, aces = 0;
       do {
         next = face(); value += next;
-        if (++aces > 1000) throw Error("Non-terminating die");
+        if (++aces > 1000) throw Error(sbsI18n("swade-hud.UI.Nonterminatingdie_03abf8f8cf"));
       } while (explosion && compare(next, explosion.comparison, explosion.value ?? (node.fate ? 1 : node.coin ? 1 : node.faces)) && (explosion.kind !== "xo" || aces === 1));
       for (const mod of node.modifiers) {
         if (mod.kind === "min") value = Math.max(value, mod.value);
@@ -212,7 +213,7 @@ function sampledDistribution(root, formula) {
     return select(values, node.modifiers.filter((mod) => ["kh", "kl", "dh", "dl"].includes(mod.kind)));
   }
   const distribution = new Map(), count = 32768;
-  for (let i = 0; i < count; i++) { const value = sample(root); if (!Number.isFinite(value)) throw Error("Non-finite arithmetic"); add(distribution, value, 1 / count); }
+  for (let i = 0; i < count; i++) { const value = sample(root); if (!Number.isFinite(value)) throw Error(sbsI18n("swade-hud.UI.Nonfinitearithmetic_6126e807a0")); add(distribution, value, 1 / count); }
   return distribution;
 }
 function traitDice(root) {
@@ -228,7 +229,7 @@ function limits(root, entries) {
     if (root.op === "-") return [a - d, b - c];
     if (["*", "/"].includes(root.op)) {
       if (root.op === "*" && ((a === 0 && b === 0) || (c === 0 && d === 0))) return [0, 0];
-      if (root.op === "/" && c <= 0 && d >= 0) throw Error("Division through zero");
+      if (root.op === "/" && c <= 0 && d >= 0) throw Error(sbsI18n("swade-hud.UI.Divisionthroughzero_a3ba32cb2d"));
       const values = [operation(root.op, a, c), operation(root.op, a, d), operation(root.op, b, c), operation(root.op, b, d)].filter((v) => !Number.isNaN(v));
       return [Math.min(...values), Math.max(...values)];
     }
@@ -279,14 +280,14 @@ export function rollStatistics(formula, { trait = false, target = 4, bestShot = 
       distribution = sampledDistribution(root, formula); sampled = true;
     }
     const mass = [...distribution.values()].reduce((a, b) => a + b, 0);
-    if (mass < 1 - 1e-8) throw Error("Analysis tail exceeds precision limit");
+    if (mass < 1 - 1e-8) throw Error(sbsI18n("swade-hud.UI.Analysistailexceedsprecisionlimit_1d96f13cb9"));
     const entries = [...distribution].sort(([a], [b]) => a - b);
     const [minimum, maximum] = limits(root, entries);
     const average = entries.reduce((sum, [value, probability]) => sum + value * probability, 0) / mass;
     const critical = new Map();
     if (trait) {
       const dice = traitDice(root);
-      if (dice.some((die) => die.number !== 1) || dice.length > 8) throw Error("Unsupported trait pool");
+      if (dice.some((die) => die.number !== 1) || dice.length > 8) throw Error(sbsI18n("swade-hud.UI.Unsupportedtraitpool_ab985c99a9"));
       for (let mask = 0; mask < 2 ** dice.length; mask++) {
         const ones = dice.map((_, i) => Boolean(mask & (1 << i)));
         if (ones.filter(Boolean).length <= dice.length / 2 || dice.some((die, i) => die.wild && !ones[i])) continue;
@@ -311,7 +312,7 @@ export function rollStatistics(formula, { trait = false, target = 4, bestShot = 
         return 1;
       },
       unbounded: ![minimum, maximum].every(Number.isFinite), approximate: sampled, formula };
-    if (!Number.isFinite(average) || Number.isNaN(minimum) || Number.isNaN(maximum)) throw Error("Invalid statistics");
+    if (!Number.isFinite(average) || Number.isNaN(minimum) || Number.isNaN(maximum)) throw Error(sbsI18n("swade-hud.UI.Invalidstatistics_bafe4dac4a"));
     if (cache.size >= 96) cache.delete(cache.keys().next().value);
     cache.set(key, result);
     return result;

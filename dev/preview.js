@@ -91,6 +91,7 @@ toolsPreference.checked=game.settings.get(MODULE_ID,SWADE_TOOLS_SETTING);
 toolsPreference.onchange=()=>game.settings.set(MODULE_ID,SWADE_TOOLS_SETTING,toolsPreference.checked);
 globalThis.ui = { hotbar: { locked: false }, notifications: { error: (message) => { record("error", message); document.querySelector("#result").textContent = message; } } };
 class FixtureApplication {
+  static _maxZ = 105;
   constructor(options = {}) { this.options = options; }
   async _renderFrame() {
     const el = document.createElement("div");
@@ -110,8 +111,16 @@ class FixtureApplication {
     const result = await this._renderHTML?.();
     if (result) this._replaceHTML(result, this.element.querySelector(".window-content") ?? this.element);
     document.body.append(this.element);
+    if (this.constructor.DEFAULT_OPTIONS?.window?.frame !== false) {
+      this.bringToFront();
+      this.element.addEventListener("pointerdown", () => this.bringToFront());
+    }
     this.element.addEventListener("click", (event) => this.constructor.DEFAULT_OPTIONS?.actions?.[event.target.closest("[data-action]")?.dataset.action]?.());
     return this;
+  }
+  bringToFront() {
+    if (ui.activeWindow !== this) this.element.style.zIndex = String(++FixtureApplication._maxZ);
+    ui.activeWindow = this;
   }
   close() { this.element?.remove(); }
   setPosition(position) { for (const [key,value] of Object.entries(position)) this.element.style[key] = value + "px"; }
@@ -288,7 +297,10 @@ item("ancestry","Human","ancestry",{},"icons/svg/mystery-man.svg");
 item("ability","Infravision","ability",{},"icons/svg/eye.svg");
 item("action","Battle Cry","action",{actions:{trait:"Intimidation",additional:{test:{name:"Test",type:"trait"}}}},"icons/svg/sound.svg");
 item("unskilled","Unskilled Attempt","skill",{swid:"unskilled-attempt",die:{sides:4,modifier:-2},attribute:""},"icons/svg/dice-target.svg");
-actor.items = Object.assign(itemList, { get: (id) => itemList.find((doc) => doc.id === id) });
+actor.items = Object.assign(itemList, {
+  get: (id) => itemList.find((doc) => doc.id === id),
+  has: (id) => itemList.some((doc) => doc.id === id),
+});
 actor.effects = Object.assign([], { get: (id) => actor.effects.find((effect) => effect.id === id) });
 actor.allApplicableEffects = () => [...actor.effects, ...itemList.flatMap((item) => item.effects ?? [])];
 function sizeContribution(effect) {
@@ -430,11 +442,34 @@ document.querySelector("#checks").onclick = async (event) => {
       && [...hud.element.querySelectorAll(".shortcut.item")].every((slot)=>slot.querySelectorAll(".icon").length===1));
     const shortcutFor = (id) => [...hud.element.querySelectorAll(".shortcut.item")].find((slot)=>
       hud.resolveShortcut(hud.shortcuts()[Number(slot.dataset.slot)])?.doc?.id===id);
+    const dialog = await new FixtureApplication({window: {title: "Window stacking fixture"}}).render();
+    const pointerDown = element => element.dispatchEvent(new PointerEvent("pointerdown", {bubbles: true}));
+    const layer = element => Number(getComputedStyle(element).zIndex);
+    const sidebarButton = () => hud.element.querySelector('[data-sidebar="actions"]');
+    sidebarButton().click();
+    await tick();
+    assert("Opening a HUD panel raises it above the active dialog", layer(hud.sidebar) > layer(dialog.element));
+    pointerDown(dialog.element);
+    assert("Refocusing the same dialog raises it above the HUD panel", layer(dialog.element) > layer(hud.sidebar));
+    const previousLayer = layer(hud.sidebar);
+    hud.render();
+    assert("Background HUD refresh keeps the panel behind the dialog", layer(hud.sidebar) === previousLayer);
+    pointerDown(hud.sidebar);
+    assert("Clicking inside the HUD panel raises it again", layer(hud.sidebar) > layer(dialog.element));
+    sidebarButton().click();
+    pointerDown(dialog.element);
     const rollsBeforePopup = calls.filter((call)=>call.method==="itemAction").length;
     shortcutFor("spear").click();
     await tick();
     assert("Weapon shortcut opens its action popup before rolling", Boolean(hud.description?.element?.isConnected)
       && calls.filter((call)=>call.method==="itemAction").length===rollsBeforePopup);
+    const shortcutPanel = hud.description.element;
+    assert("Opening a shortcut panel raises it above the active dialog", layer(shortcutPanel) > layer(dialog.element));
+    pointerDown(dialog.element);
+    assert("Clicking the dialog raises it above the shortcut panel", layer(dialog.element) > layer(shortcutPanel));
+    pointerDown(shortcutPanel);
+    assert("Clicking the shortcut panel raises it again", layer(shortcutPanel) > layer(dialog.element));
+    dialog.close();
     assert("Shortcut popup contains only buttons without a movable header", !hud.description.element.querySelector(".window-header,.item-vital-stats,.description,.item-notes")
       && hud.description.constructor.DEFAULT_OPTIONS.window.frame===false);
     const popupBounds=hud.description.element.getBoundingClientRect();
@@ -882,8 +917,9 @@ document.querySelector("#checks").onclick = async (event) => {
       && calls.some((call)=>call.method==="changeTab" && call.args.join()==="advances,about"));
     hud.element.querySelector('[data-sidebar=skills]').click();
     await tick();
-    assert("Only the owned Unskilled Attempt remains", hud.sidebar.querySelectorAll('.item[data-item-id=unskilled]').length === 1
-      && !hud.sidebar.querySelector('[data-action=unskilled]'));
+    assert("The only Unskilled Attempt is pinned to the bottom of Skills", hud.sidebar.querySelectorAll('.item[data-item-id=unskilled]').length === 1
+      && hud.sidebar.querySelector(".item-list").lastElementChild.matches(".unskilled-attempt:has([data-item-id=unskilled])")
+      && getComputedStyle(hud.sidebar.querySelector(".unskilled-attempt")).columnSpan === "all");
     assert("The Skills panel has no standalone Attributes section", !hud.sidebar.querySelector('[data-action="attribute"]')
       && ![...hud.sidebar.querySelectorAll("header")].some(header => header.textContent === "Attributes"));
     const skillRow = hud.sidebar.querySelector('[data-modifier=skill][data-item-id=skill0]');
@@ -966,6 +1002,29 @@ document.querySelector("#checks").onclick = async (event) => {
     await tick();
     const skillSection = name => [...hud.sidebar.querySelectorAll(".skill-section")]
       .find(section => section.querySelector(".skill-title")?.textContent === name);
+    const athletics = skillSection("Athletics");
+    const athleticsActions = athletics.querySelector(".skill-actions");
+    const extraActions = Array.from({length: 28}, (_, index) => {
+      const row = document.createElement("div");
+      row.className = "item trait-action-row";
+      row.textContent = "Athletics action " + (index + 1);
+      athleticsActions.append(row);
+      return row;
+    });
+    hud.setSkillActionsExpanded(athletics, true);
+    hud.positionSidebar();
+    await tick();
+    const populatedSkillColumns = () => new Set([...hud.sidebar.querySelectorAll(".skill-section:not([hidden]):not(.unskilled-attempt)")]
+      .map(section => Math.round(section.getBoundingClientRect().left))).size;
+    assert("Expanding an oversized Athletics accordion does not reserve empty columns",
+      Number(hud.sidebar.style.getPropertyValue("--nb-columns")) === populatedSkillColumns()
+      && athletics.getBoundingClientRect().height > hud.sidebar.querySelector(".inner").clientHeight);
+    hud.positionSidebar();
+    assert("Repositioning a tall skills panel keeps its column count stable",
+      Number(hud.sidebar.style.getPropertyValue("--nb-columns")) === populatedSkillColumns());
+    hud.setSkillActionsExpanded(athletics, false);
+    extraActions.forEach(row => row.remove());
+    hud.positionSidebar();
     const intimidation = skillSection("Intimidation");
     assert("Skills show their own actions with plain Support, Test, and Earn controls", intimidation?.textContent.includes("Battle Cry")
       && [...intimidation.querySelectorAll(".skill-common a")].map(control => control.textContent).join(",") === "Support,Test,Earn"
@@ -973,8 +1032,11 @@ document.querySelector("#checks").onclick = async (event) => {
     assert("Skill headings show the name before the die", intimidation.querySelector(".skill-title")?.nextElementSibling.classList.contains("skill-die"));
     const skillToggle = intimidation.querySelector(".skill-actions-toggle");
     const skillActions = intimidation.querySelector(".skill-actions");
-    assert("The Actions toggle is on its own row below the skill header", skillToggle.textContent === "Actions"
-      && skillToggle.previousElementSibling.classList.contains("skill-heading") && skillToggle.nextElementSibling === skillActions);
+    assert("Support Test and Earn stay between the skill header and Actions accordion", skillToggle.textContent === "Actions"
+      && skillToggle.previousElementSibling.classList.contains("skill-common")
+      && skillToggle.previousElementSibling.previousElementSibling.classList.contains("skill-heading")
+      && !skillToggle.previousElementSibling.hidden && skillToggle.nextElementSibling === skillActions
+      && !skillActions.contains(intimidation.querySelector(".skill-common")));
     assert("Skill actions are collapsed by default", skillActions.hidden && skillToggle.getAttribute("aria-expanded") === "false"
       && skillToggle.getAttribute("aria-controls") === skillActions.id);
     skillToggle.dispatchEvent(new KeyboardEvent("keydown", {bubbles: true, key: "Enter"}));
@@ -1174,8 +1236,18 @@ document.querySelector("#checks").onclick = async (event) => {
     hud.element.querySelector('[data-slot="10"]').click();
     hud.element.querySelector('[data-slot="11"]').click();
     await tick();
-    assert("Attribute and skill shortcuts use SWADE Tools", calls.some((call)=>call.method==="toolsAttribute" && call.args[1]==="vigor")
+    const skillPopup = hud.description.element;
+    assert("Skill shortcuts offer Roll above Support, Test, and Earn only",
+      skillPopup.querySelector(".skill-roll-action").textContent === "Roll"
+      && [...skillPopup.querySelectorAll(".skill-common-actions button")].map(button => button.textContent).join(",") === "Support,Test,Earn"
+      && skillPopup.querySelectorAll("[data-popup-action]").length === 4);
+    skillPopup.querySelector('[data-popup-action="roll"]').click();
+    await tick();
+    assert("Attribute shortcuts and the skill shortcut Roll button use SWADE Tools", calls.some((call)=>call.method==="toolsAttribute" && call.args[1]==="vigor")
       && calls.filter((call)=>call.method==="toolsSkill" && call.args[1]==="skill0").length>=2);
+    hud.element.querySelector('[data-slot="11"]').click();
+    await tick();
+    assert("Clicking the same skill shortcut closes its panel", !hud.description);
     for(const id of ["spear","power0"]){
       const before=calls.filter((call)=>call.method==="toolsItem").length;
       shortcutFor(id).click();

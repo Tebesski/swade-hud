@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { placePowerTemplate, powerTemplates } from "./powers.js";
 
 const MARKER = "swadeHudPowerCast";
@@ -122,7 +123,7 @@ function templateButtons(templates) {
   group.className = "card-buttons template-controls";
   const title = document.createElement("h4");
   title.className = "actions-subheading";
-  title.innerHTML = '<i class="fa-solid fa-bullseye" aria-hidden="true"></i> ';
+  title.innerHTML = `<i class="fa-solid fa-bullseye" aria-hidden="true"></i> `;
   title.append(game.i18n.localize("SWADE.Templates.Available"));
   const buttons = document.createElement("span");
   buttons.className = "flexrow";
@@ -150,7 +151,7 @@ export async function renderPowerCastCard(message, html, useItem) {
   const card = foundry.utils.parseHTML(await foundry.applications.handlebars.renderTemplate("systems/swade/templates/chat/item-card.hbs", data));
   if (!message.isContentVisible || content.querySelector(".swade-hud-power-cast")) return;
   card.classList.add("swade-hud-power-cast");
-  card.querySelectorAll(".trait-rolls, .template-controls, .pp-controls, .arcane-device-controls").forEach((group) => group.remove());
+  card.querySelectorAll(".trait-rolls, .template-controls, .pp-controls, .arcane-device-controls, .resist-rolls").forEach((group) => group.remove());
   const description = card.querySelector(".card-content");
   card.querySelector(".item-name")?.addEventListener("click", () => description?.classList.toggle("expanded"));
   const canUse = Boolean(item.actor?.isOwner);
@@ -164,8 +165,9 @@ export async function renderPowerCastCard(message, html, useItem) {
   description.after(...content.childNodes, ...(damage ? [damage] : []));
   if (canUse) {
     const rollDamage = (action, additionalMods) => useItem(item.actor, item, action, undefined, {nativeOnly: true, additionalMods});
-    const controls = betterTemplates?.castTemplateControls?.(item, message, castContext, card, rollDamage) ?? templateButtons(powerTemplates(item));
-    if (controls) tail.after(controls);
+    const controls = betterTemplates?.castTemplateControls?.(item, message, castContext, card, rollDamage);
+    const nativeTemplates = controls?.classList.contains("template-controls") ? null : templateButtons(powerTemplates(item));
+    tail.after(...[nativeTemplates, controls].filter(Boolean));
     powers?.wirePowerDamageControls?.(item, message, card, rollDamage);
   }
   for (const button of card.querySelectorAll(":scope > .card-buttons button[data-action]:not([data-sbt-cast-damage], [data-sbp-cast-damage])")) {
@@ -181,7 +183,7 @@ export async function renderPowerCastCard(message, html, useItem) {
           let actor = item.actor;
           if (item.system.actions?.additional?.[action]?.type === "resist") {
             const controlled = globalThis.canvas?.tokens?.controlled ?? [];
-            if (controlled.length !== 1) return ui.notifications.warn("Select one token to make a resistance roll.");
+            if (controlled.length !== 1) return ui.notifications.warn(sbsI18n("swade-hud.UI.Selectonetokentomakea_cad89e8401"));
             actor = controlled[0].actor;
           }
           await useItem(actor, item, action, event, { nativeOnly: true });

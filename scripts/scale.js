@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { renderSizeReference } from "./size-reference.js";
 import { tokenFootprint } from "../../swade-better-setting/scripts/npc-size.mjs";
 import { MODULE_ID } from "./swade.js";
@@ -100,7 +101,7 @@ export async function applySizeChange(actor, token, size, timing) {
   if (!actor?.isOwner || !token?.isOwner || token.actor?.uuid !== actor.uuid || !path || !Number.isSafeInteger(size)) return;
   const { duration, units } = timing;
   if (!Number.isSafeInteger(duration) || duration <= 0 || !["rounds", "minutes", "hours"].includes(units)) {
-    throw new Error("Enter a positive whole-number duration.");
+    throw new Error(sbsI18n("swade-hud.UI.Enterapositivewholenumberduration_0db07fc537"));
   }
   const delta = size - actorSize(actor);
   const effects = await actor.createEmbeddedDocuments("ActiveEffect", [{
@@ -137,10 +138,10 @@ export function showSizeDialog(actor, apply) {
   sizeRow.className = "form-group";
   const label = document.createElement("label");
   label.htmlFor = "swade-hud-actor-size";
-  label.textContent = "Size";
+  label.textContent = sbsI18n("swade-hud.UI.Size_1af8519073");
   const input = document.createElement("input");
   input.id = label.htmlFor;
-  input.name = "size";
+  input.name = sbsI18n("swade-hud.UI.size_ccdcbe846f");
   input.type = "number";
   input.step = "1";
   input.required = true;
@@ -152,13 +153,13 @@ export function showSizeDialog(actor, apply) {
   durationRow.className = "form-group size-duration";
   const durationLabel = document.createElement("label");
   durationLabel.htmlFor = "swade-hud-size-duration";
-  durationLabel.textContent = "Duration (optional)";
+  durationLabel.textContent = sbsI18n("swade-hud.UI.Durationoptional_b86b27f4c2");
   const duration = document.createElement("input");
-  Object.assign(duration, { id: durationLabel.htmlFor, name: "duration", type: "number", min: "1", step: "1" });
+  Object.assign(duration, { id: durationLabel.htmlFor, name: sbsI18n("swade-hud.UI.duration_caa79af4db"), type: "number", min: "1", step: "1" });
   const units = document.createElement("select");
-  units.name = "units";
-  units.setAttribute("aria-label", "Duration units");
-  for (const [value, text] of [["rounds", "Rounds"], ["minutes", "Minutes"], ["hours", "Hours"]]) {
+  units.name = sbsI18n("swade-hud.UI.units_c981a30c0e");
+  units.setAttribute("aria-label", sbsI18n("swade-hud.UI.Durationunits_b249354e44"));
+  for (const [value, text] of [["rounds", sbsI18n("swade-hud.UI.Rounds_e9af9cdec8")], ["minutes", sbsI18n("swade-hud.UI.Minutes_4f846a84e7")], ["hours", sbsI18n("swade-hud.UI.Hours_21e8492938")]]) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = text;
@@ -170,7 +171,7 @@ export function showSizeDialog(actor, apply) {
     classes: ["swade-hud-size-dialog"], window: { title: "Size - " + actor.name },
     content: content.outerHTML,
     buttons: [
-      { action: "apply", label: "Apply", icon: "fa-solid fa-check", default: true,
+      { action: "apply", label: sbsI18n("swade-hud.UI.Apply_31e392d1c0"), icon: "fa-solid fa-check", default: true,
         callback: (_event, button) => {
           const form = button.form;
           const value = form.elements.namedItem("size").valueAsNumber;
@@ -178,7 +179,7 @@ export function showSizeDialog(actor, apply) {
           const timing = duration.value.trim() ? { duration: duration.valueAsNumber, units: form.elements.namedItem("units").value } : undefined;
           if (Number.isSafeInteger(value)) return apply(value, timing);
         } },
-      { action: "cancel", label: "Cancel", icon: "fa-solid fa-xmark", callback: () => {} },
+      { action: "cancel", label: sbsI18n("swade-hud.UI.Cancel_19766ed6cc"), icon: "fa-solid fa-xmark", callback: () => {} },
     ],
   });
 }
@@ -190,12 +191,12 @@ export function showSizeReference() {
       static DEFAULT_OPTIONS = {
         classes: ["swade-hud-size-reference"],
         position: { width: 900, height: "auto" },
-        window: { title: "Size Table", resizable: true },
+        window: { title: sbsI18n("swade-hud.UI.SizeTable_a85aa336bb"), resizable: true },
       };
       async _renderHTML() { return renderSizeReference(); }
       _replaceHTML(result, content) { content.replaceChildren(result); }
     }
-    reference = new SizeReference({ id: "swade-hud-size-reference", window: { title: "Size Table" } });
+    reference = new SizeReference({ id: "swade-hud-size-reference", window: { title: sbsI18n("swade-hud.UI.SizeTable_a85aa336bb") } });
   }
   return reference.render({ force: true });
 }

@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { findEdge } from "./basic-actions.js";
 import { applyTimedStatus } from "./effects.js";
 import { hasStatus } from "./swade.js";
@@ -6,14 +7,14 @@ const MODULE_ID = "swade-hud";
 const MARKER = "swadeHudWeaponOptions";
 const choicesByActor = new WeakMap();
 const options = [
-  {id: "wild", label: "Wild Attack", help: "+2 to Fighting and damage. Become Vulnerable."},
-  {id: "nonlethal", label: "Nonlethal Attack", help: "Use fists or a blunt weapon. Choose Flat of blade for an edged weapon."},
-  {id: "mounted", label: "Horseback attack", help: "Use the lower of Fighting and Riding.", mounted: true},
-  {id: "charge", label: "Mounted Charge", help: "+4 damage when the charge qualifies.", mounted: true},
-  {id: "sweep", label: "Sweep", help: "Select the targets in Reach. Apply −2 when using a one-handed weapon.", edges: ["sweep", "improved-sweep"]},
-  {id: "close", label: "Close Fighting", help: "Use the edge and any situational modifiers from your setting.", edges: ["close-fighting", "improved-close-fighting"]},
-  {id: "desperate2", label: "Desperate Attack +2", help: "+2 to Fighting and −2 damage."},
-  {id: "desperate4", label: "Desperate Attack +4", help: "+4 to Fighting and −4 damage."},
+  {id: "wild", get label() { return sbsI18n("swade-hud.UI.WildAttack_90fb7b1f5f"); }, get help() { return sbsI18n("swade-hud.UI.2toFightinganddamageBecome_7e2c918643"); }},
+  {id: "nonlethal", get label() { return sbsI18n("swade-hud.UI.NonlethalAttack_b3b6dfe6ce"); }, get help() { return sbsI18n("swade-hud.UI.Usefistsorabluntweapon_30cf509b1b"); }},
+  {id: "mounted", get label() { return sbsI18n("swade-hud.UI.Horsebackattack_a748343307"); }, get help() { return sbsI18n("swade-hud.UI.UsethelowerofFightingand_2ca2fa79fb"); }, mounted: true},
+  {id: "charge", get label() { return sbsI18n("swade-hud.UI.MountedCharge_8efe85224f"); }, get help() { return sbsI18n("swade-hud.UI.4damagewhenthechargequalifies_f024878715"); }, mounted: true},
+  {id: "sweep", get label() { return sbsI18n("swade-hud.UI.Sweep_310b02ef1b"); }, get help() { return sbsI18n("swade-hud.UI.SelectthetargetsinReachApply_b0c4c9ec93"); }, edges: ["sweep", "improved-sweep"]},
+  {id: "close", get label() { return sbsI18n("swade-hud.UI.CloseFighting_6433fdc1f4"); }, get help() { return sbsI18n("swade-hud.UI.Usetheedgeandanysituational_870593026e"); }, edges: ["close-fighting", "improved-close-fighting"]},
+  {id: "desperate2", get label() { return sbsI18n("swade-hud.UI.DesperateAttack2_dfe0f8a59a"); }, get help() { return sbsI18n("swade-hud.UI.2toFightingand2damage_ba9c04a270"); }},
+  {id: "desperate4", get label() { return sbsI18n("swade-hud.UI.DesperateAttack4_812e96eeb0"); }, get help() { return sbsI18n("swade-hud.UI.4toFightingand4damage_61fdd94842"); }},
 ];
 const styles = ["wild", "desperate2", "desperate4"];
 
@@ -21,10 +22,10 @@ export function attackOptions(actor) {
   const available = options.filter(option => (!option.mounted || hasStatus(actor, "mounted"))
     && (!option.edges || findEdge(actor, ...option.edges)));
   if (attackOptionState(actor, "nonlethal")) {
-    available.push({id: "flatBlade", label: "Flat of blade", help: "Apply −1 to Fighting when using the flat of an edged weapon."});
+    available.push({id: "flatBlade", label: sbsI18n("swade-hud.UI.Flatofblade_301dfec79f"), help: sbsI18n("swade-hud.UI.Apply1toFightingwhenusing_08f3b56213")});
   }
   if (available.some(option => option.id === "sweep") && attackOptionState(actor, "sweep")) {
-    available.push({id: "twoHanded", label: "Two-handed grip (Sweep)", help: "Use a two-handed weapon to avoid the Sweep penalty."});
+    available.push({id: "twoHanded", label: sbsI18n("swade-hud.UI.TwohandedgripSweep_a35c8c294d"), help: sbsI18n("swade-hud.UI.Useatwohandedweaponto_292b04029e")});
   }
   return available;
 }
@@ -67,13 +68,13 @@ export function weaponModifiers(actor, modes, kind) {
   const damage = kind === "damage";
   if (modes.wild && !actor.statuses?.has("wild-attack")) {
     const override = damage ? actor.getFlag?.("swade", "wildAttackDamage") : undefined;
-    modifiers.push({label: "Wild Attack", value: Number(override ?? 2)});
+    modifiers.push({label: sbsI18n("swade-hud.UI.WildAttack_90fb7b1f5f"), value: Number(override ?? 2)});
   }
   const desperate = modes.desperate4 ? 4 : modes.desperate2 ? 2 : 0;
-  if (desperate && !modes.wild) modifiers.push({label: "Desperate Attack", value: damage ? -desperate : desperate});
-  if (damage && modes.charge) modifiers.push({label: "Mounted Charge", value: 4});
-  if (!damage && modes.sweep && !modes.twoHanded) modifiers.push({label: "Sweep", value: -2});
-  if (!damage && modes.nonlethal && modes.flatBlade) modifiers.push({label: "Nonlethal · Flat of blade", value: -1});
+  if (desperate && !modes.wild) modifiers.push({label: sbsI18n("swade-hud.UI.DesperateAttack_e1e0bf0460"), value: damage ? -desperate : desperate});
+  if (damage && modes.charge) modifiers.push({label: sbsI18n("swade-hud.UI.MountedCharge_8efe85224f"), value: 4});
+  if (!damage && modes.sweep && !modes.twoHanded) modifiers.push({label: sbsI18n("swade-hud.UI.Sweep_310b02ef1b"), value: -2});
+  if (!damage && modes.nonlethal && modes.flatBlade) modifiers.push({label: sbsI18n("swade-hud.UI.NonlethalFlatofblade_f20cfeff92"), value: -1});
   return modifiers;
 }
 
@@ -102,7 +103,7 @@ export async function rollMountedAttack(actor, item, action, skill, additionalMo
   additionalMods.push(...(item.traitModifiers ?? []));
   if (variant?.modifier) additionalMods.push({label: variant.name, value: variant.modifier});
   const roll = await helper.doTraitAction(skill, actor, {
-    item, additionalMods, rof: variant?.dice, flavour: variant?.name || "Horseback attack",
+    item, additionalMods, rof: variant?.dice, flavour: variant?.name || sbsI18n("swade-hud.UI.Horsebackattack_a748343307"),
   });
   if (roll && variant) await item.consume(uses);
   helper.callActionHook?.(actor, item, action, roll);
@@ -112,9 +113,9 @@ export async function rollMountedAttack(actor, item, action, skill, additionalMo
 function resolvedModes(data, roll) {
   const modes = {...data.modes};
   const ignored = label => roll.modifiers?.some(mod => mod.label === label && mod.ignore);
-  if (ignored("Wild Attack")) modes.wild = false;
-  if (ignored("Desperate Attack")) modes.desperate2 = modes.desperate4 = false;
-  if (ignored("Mounted Charge")) modes.charge = false;
+  if (ignored(sbsI18n("swade-hud.UI.WildAttack_90fb7b1f5f"))) modes.wild = false;
+  if (ignored(sbsI18n("swade-hud.UI.DesperateAttack_e1e0bf0460"))) modes.desperate2 = modes.desperate4 = false;
+  if (ignored(sbsI18n("swade-hud.UI.MountedCharge_8efe85224f"))) modes.charge = false;
   return modes;
 }
 
@@ -162,12 +163,12 @@ export function renderWeaponMessage(message, html, useItem) {
   summary.className = "swade-hud-weapon-summary";
   const labels = options.filter(option => data.modes[option.id]).map(option => option.label);
   summary.textContent = labels.join(" · ");
-  if (data.kind === "damage" && data.modes.nonlethal) summary.append(" · On Incapacitation, unconscious for 1d6 hours.");
+  if (data.kind === "damage" && data.modes.nonlethal) summary.append(sbsI18n("swade-hud.UI.OnIncapacitationunconsciousfor1d6hours_02b1d8cb1b"));
   const item = foundry.utils.fromUuidSync(data.itemUuid);
   if (data.kind === "attack" && item?.actor?.isOwner && item.system.damage) {
     const damage = document.createElement("button");
     damage.type = "button";
-    damage.textContent = "Roll damage with these options";
+    damage.textContent = sbsI18n("swade-hud.UI.Rolldamagewiththeseoptions_a9c6c53132");
     damage.onclick = async event => {
       damage.disabled = true;
       try {

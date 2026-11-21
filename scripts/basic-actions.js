@@ -1,16 +1,37 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { ATTRIBUTES, MODULE_ID, itemsOf, localize, rollAttribute, rollSkill } from "./swade.js";
-import { rollSupport } from "./support.js";
+import { rollSupport, traitActionReceiver } from "./support.js";
 
 const SETTING_MODULE = "swade-better-setting";
 const CORE = "swade-core-rules";
 const CORE_ACTIONS = new Set(["disarm", "grapple", "jump", "push", "treat-wounds", "suppressive-fire",
   "network-the-nice-way", "network-the-not-so-nice-way"]);
 const CHASE_SKILLS = new Set(["athletics", "boating", "driving", "piloting", "riding"]);
-const PER_SKILL = new Set(["support", "test", "earn"]);
-const TEST_RAISE_NOTE = "You won the Test with a raise. The target is also Shaken or there may be other subjective effects as the GM allows, such as a tripped foe being knocked prone.";
+export const COMMON_SKILL_ACTIONS = {get support() { return sbsI18n("swade-hud.UI.Support_be91940b79"); }, get test() { return sbsI18n("swade-hud.UI.Test_532eaabd95"); }, get earn() { return sbsI18n("swade-hud.UI.Earn_a697f90fb1"); }};
+export function hustleProvider() {
+  const money = game.modules?.get("swade-better-money")?.api;
+  return money?.hustleEnabled?.() ? money : null;
+}
+
+export function commonSkillActionLabel(kind) {
+  return kind === "earn" ? hustleProvider()?.hustleLabel() ?? sbsI18n("swade-hud.UI.Earn_a697f90fb1") : COMMON_SKILL_ACTIONS[kind];
+}
+
+export function basicActionLabel(item) {
+  return actionKind(item) === "earn" ? hustleProvider()?.hustleLabel() ?? item.name : item.name;
+}
+const PER_SKILL = new Set(Object.keys(COMMON_SKILL_ACTIONS));
+const TEST_RAISE_NOTE = sbsI18n("swade-hud.UI.YouwontheTestwitha_94bf6185fe");
+const TEST_QUERY = "swade-hud.resolveTest";
+const testResolutions = new Map();
 const generating = new WeakMap();
 const normalized = value => String(value ?? "").normalize("NFKC").toLocaleLowerCase().trim()
   .replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+
+export function isUnskilledAttempt(skill) {
+  return ["unskilled", "unskilled-attempt"].includes(normalized(skill.system.swid))
+    || ["unskilled-attempt", normalized(localize("SWADE.Unskilled", sbsI18n("swade-hud.UI.UnskilledAttempt_63ecc95eac")))].includes(normalized(skill.name));
+}
 
 function skillMatches(skill, value) {
   const name = normalized(value);
@@ -88,7 +109,7 @@ async function addBasicActions(actor) {
     corePack?.visible !== false ? corePack?.getDocuments() ?? [] : [],
     setting?.libraryActions?.() ?? game.packs?.get("world.better-setting-actions")?.getDocuments() ?? [],
   ]);
-  const skills = itemsOf(actor, "skill").filter(skill => !["unskilled", "unskilled-attempt"].includes(normalized(skill.system.swid || skill.name)));
+  const skills = itemsOf(actor, "skill").filter(skill => !isUnskilledAttempt(skill));
   const chaseSkills = skills.filter(skill => CHASE_SKILLS.has(normalized(skill.system.swid || skill.name)));
   const candidates = core.filter(item => item.type === "action" && CORE_ACTIONS.has(normalized(item.name))).map(item => copyAction(item));
   for (const item of supplement.filter(item => item.type === "action")) {
@@ -112,9 +133,9 @@ async function addBasicActions(actor) {
   });
   if (!actor.isOwner) return;
   const created = data.length ? await actor.createEmbeddedDocuments("Item", data) : [];
-  ui.notifications.info(created.length ? "Added " + created.length + " basic actions." : "No new basic actions to add.");
-  if (!core.length) ui.notifications.warn("Enable Savage Worlds Adventure Edition Core Rules to import its actions.");
-  if (!supplement.length) ui.notifications.warn("Better Setting — Actions becomes available after a GM initializes the compendium.");
+  ui.notifications.info(created.length ? "Added " + created.length + " basic actions." : sbsI18n("swade-hud.UI.Nonewbasicactionstoadd_8e40ddcc01"));
+  if (!core.length) ui.notifications.warn(sbsI18n("swade-hud.UI.EnableSavageWorldsAdventureEditionCore_d2664045bb"));
+  if (!supplement.length) ui.notifications.warn(sbsI18n("swade-hud.UI.BetterSettingActionsbecomesavailableafter_1a6f959c47"));
   return created;
 }
 
@@ -156,11 +177,21 @@ export function actionTarget() {
   return targets.length === 1 ? targets[0].document ?? targets[0] : null;
 }
 
-export async function rollCommonSkillAction(actor, skill, kind) {
+export async function rollCommonSkillAction(actor, skill, kind, targetingResolved = false) {
+  if (!actor?.isOwner || !Object.hasOwn(COMMON_SKILL_ACTIONS, kind)) return;
+  const targeting = game.modules.get("swade-better-setting")?.api?.withAdvancedTargeting;
+  if (!targetingResolved && targeting && ["support", "test"].includes(kind)) {
+    return targeting({actor, traitAction: true}, () => rollCommonSkillAction(actor, skill, kind, true));
+  }
+  const hustles = kind === "earn" && hustleProvider();
+  if (hustles) return hustles.hustle(actor, skill);
   const target = actionTarget();
-  const title = {support: "Support", test: "Test", earn: "Earn"}[kind];
-  const execute = () => rollSkill(actor, skill.id, {title: title + " · " + skill.name, flavour: title});
-  if (kind === "support") return rollSupport(target, execute);
+  const title = COMMON_SKILL_ACTIONS[kind];
+  const execute = () => rollSkill(actor, skill.id, {
+    title: title + " · " + skill.name, flavour: title,
+    effectFlags: ["support", "test"].includes(kind) ? [kind] : [],
+  });
+  if (kind === "support") return rollSupport(actor, target, execute);
   const roll = await execute();
   if (kind === "earn") await resolveEarn(actor, roll);
   else await resolveTest(skill, roll, target);
@@ -171,30 +202,73 @@ async function resolveTest(skill, roll, target) {
   if (!roll) return;
   if (roll.isCritfail || !(roll.total >= 4)) return;
   const attribute = ATTRIBUTES.find(([key]) => key === skill?.system.attribute);
-  if (!attribute) return ui.notifications.info("Resolve the Test with the appropriate opposed attribute.");
-  const defender = target?.actor;
+  if (!attribute) return ui.notifications.info(sbsI18n("swade-hud.UI.ResolvetheTestwiththeappropriate_b91daf382d"));
   const [key, label] = attribute;
   const name = localize(label, key);
-  if (!defender?.isOwner || !defender.system.attributes?.[key]) {
+  if (!target?.actor) {
     return ui.notifications.info("Test total " + roll.total + ". The defender opposes with " + name + ".");
   }
   const choice = await foundry.applications.api.DialogV2.wait({
     window: {title: "Resolve Test · " + target.name},
-    content: "<p>Oppose with " + foundry.utils.escapeHTML(name) + " against " + roll.total + ".</p>",
+    content: `<p>${sbsI18n("swade-hud.UI.Opposewith_7ef5ec8bec")} ` + foundry.utils.escapeHTML(name) + " against " + roll.total + ".</p>",
     rejectClose: false,
     buttons: [
-      {action: "distracted", label: "Roll · Distracted on a loss"},
-      {action: "vulnerable", label: "Roll · Vulnerable on a loss"},
+      {action: "distracted", label: sbsI18n("swade-hud.UI.Distracted_a3e6990bfc")},
+      {action: "vulnerable", label: sbsI18n("swade-hud.UI.Vulnerable_cb44173a1e")},
     ]
   });
   if (!["distracted", "vulnerable"].includes(choice)) return;
-  const resistance = await rollAttribute(defender, key, {title: "Resist Test", flavour: "Resist Test"});
-  if (!resistance || !defender.isOwner || (!resistance.isCritfail && resistance.total >= roll.total)) return;
-  if (!defender.statuses.has(choice)) await defender.toggleActiveEffect(choice, {active: true});
-  if (roll.total - resistance.total >= 4) {
-    const message = game.messages.get(resistance.messageId);
-    if (message) await message.setFlag(MODULE_ID, "testRaise", true);
+  const message = game.messages.get(roll.messageId);
+  if (!message) return ui.notifications.warn(sbsI18n("swade-hud.UI.ThecompletedTestrollcouldnot_d957f1085a"));
+  const receiver = traitActionReceiver(target.actor, message);
+  if (!receiver) return ui.notifications.warn(sbsI18n("swade-hud.UI.SharetheTestrollwitha_6e7afa9132"));
+  await message.setFlag(MODULE_ID, "testRequest", {targetUuid: target.uuid, skillId: skill.id, choice});
+  const resolved = receiver.id === game.user.id
+    ? await resolveTestRequest(message, game.user)
+    : await receiver.query(TEST_QUERY, {messageUuid: message.uuid});
+  if (resolved && !message.getFlag(MODULE_ID, "testResolved")) await message.setFlag(MODULE_ID, "testResolved", true);
+}
+
+async function resolveTestRequest(message, user) {
+  if (!message?.id || message.author?.id !== user.id) throw new Error(sbsI18n("swade-hud.UI.TheTestrollmustbelongto_c435ff355e"));
+  if (message.isContentVisible === false) throw new Error(sbsI18n("swade-hud.UI.SharetheTestrollwiththe_8b87c0d32d"));
+  if (message.getFlag(MODULE_ID, "testResolved")) return true;
+  if (testResolutions.has(message.id)) return testResolutions.get(message.id);
+  const request = message.getFlag(MODULE_ID, "testRequest");
+  const source = ChatMessage.getSpeakerActor(message.speaker);
+  const roll = message.rolls?.[0];
+  const skill = source?.items.get(request?.skillId);
+  const key = skill?.type === "skill" ? skill.system.attribute : null;
+  if (!source?.testUserPermission(user, "OWNER") || !ATTRIBUTES.some(([id]) => id === key)
+    || !["distracted", "vulnerable"].includes(request?.choice)
+    || roll?.rollType !== "trait" || roll.isCritfail || !(roll.total >= 4)) {
+    throw new Error(sbsI18n("swade-hud.UI.ResolvingaTestrequiresavalid_2845c8af3d"));
   }
+  const operation = resistTest(message, request, key, roll.total);
+  testResolutions.set(message.id, operation);
+  try { return await operation; }
+  finally { testResolutions.delete(message.id); }
+}
+
+async function resistTest(message, {targetUuid, choice}, key, total) {
+  const token = await foundry.utils.fromUuid(targetUuid);
+  const defender = token?.actor;
+  if (token?.documentName !== "Token" || !defender?.isOwner || !defender.system.attributes?.[key]) {
+    throw new Error(sbsI18n("swade-hud.UI.TheTesttargetisnolonger_6c13108875"));
+  }
+  const resistance = await rollAttribute(defender, key, {title: "Resist Test · " + token.name, flavour: sbsI18n("swade-hud.UI.ResistTest_040c5663d2"), effectFlags: ["test"]});
+  if (!resistance) return false;
+  if (resistance.isCritfail || resistance.total < total) {
+    if (!defender.statuses.has(choice)) await defender.toggleActiveEffect(choice, {active: true});
+    if (total - resistance.total >= 4) await game.messages.get(resistance.messageId)?.setFlag(MODULE_ID, "testRaise", true);
+  }
+  if (message.author.id === game.user.id || game.user.isGM) await message.setFlag(MODULE_ID, "testResolved", true);
+  return true;
+}
+
+export function registerTestQuery() {
+  CONFIG.queries[TEST_QUERY] = async ({messageUuid}, {user}) =>
+    resolveTestRequest(await foundry.utils.fromUuid(messageUuid), user);
 }
 
 export function renderTestRaiseNote(message, html) {
@@ -203,13 +277,13 @@ export function renderTestRaiseNote(message, html) {
   if (content.querySelector(".swade-hud-test-note")) return;
   const section = document.createElement("section");
   section.className = "sbe-roll-notes swade-hud-test-note";
-  section.setAttribute("aria-label", "Roll note");
+  section.setAttribute("aria-label", sbsI18n("swade-hud.UI.Rollnote_34660ea579"));
   section.tabIndex = 0;
   const entry = document.createElement("div");
   entry.className = "sbe-roll-note";
   const label = document.createElement("strong");
   label.className = "sbe-roll-note-label";
-  label.textContent = "Test";
+  label.textContent = sbsI18n("swade-hud.UI.Test_532eaabd95");
   const body = document.createElement("p");
   body.className = "sbe-roll-note-body";
   body.textContent = TEST_RAISE_NOTE;
@@ -224,8 +298,8 @@ export async function runChaseAction(actor, item) {
   let value = 2;
   if (evade) {
     const choice = await foundry.applications.api.DialogV2.wait({
-      window: {title: "Evade (Chase)"}, rejectClose: false,
-      buttons: [{action: "free", label: "Free action (−2)"}, {action: "action", label: "Action (−4)"}]
+      window: {title: sbsI18n("swade-hud.UI.EvadeChase_b4d0b91496")}, rejectClose: false,
+      buttons: [{action: "free", label: sbsI18n("swade-hud.UI.Freeaction2_3dc3a1f062")}, {action: "action", label: sbsI18n("swade-hud.UI.Action4_eacd8a203b")}]
     });
     if (!choice) return;
     value = choice === "action" ? -4 : -2;
@@ -269,16 +343,16 @@ export async function resolveBasicAction(actor, item, roll, target) {
     const skill = itemsOf(actor, "skill").find(entry => skillMatches(entry, item.system.actions?.trait));
     return resolveTest(skill, roll, target);
   }
-  if (roll.isCritfail && kind === "climb") return ui.notifications.warn("The climber falls. Use Falling damage in Extras.");
+  if (roll.isCritfail && kind === "climb") return ui.notifications.warn(sbsI18n("swade-hud.UI.TheclimberfallsUseFallingdamage_a006857f49"));
   if (roll.isCritfail && kind === "swim") {
     if (!actor.effects.some(effect => effect.flags?.[MODULE_ID]?.drowning)) {
       await actor.createEmbeddedDocuments("ActiveEffect", [{
-        name: "Drowning", type: "base", showIcon: 2, img: "icons/svg/hazard.svg",
-        description: "<p>Check remaining breath, then resolve @UUID[Compendium.swade-core-rules.swade-rules.JournalEntry.swadecor04theadv.JournalEntryPage.04drowning000000]{Drowning}.</p>",
+        name: sbsI18n("swade-hud.UI.Drowning_6328ce017a"), type: "base", showIcon: 2, img: "icons/svg/hazard.svg",
+        description: `<p>${sbsI18n("swade-hud.UI.CheckremainingbreaththenresolveUUID_f48270a523")}</p>`,
         system: {changes: []}, flags: {[MODULE_ID]: {drowning: true}}
       }]);
     }
-    return ui.notifications.warn("The swimmer starts to drown. Check Hold breath and the Drowning rules.");
+    return ui.notifications.warn(sbsI18n("swade-hud.UI.TheswimmerstartstodrownCheck_edc14ce194"));
   }
   if (kind === "earn") return resolveEarn(actor, roll);
 }
@@ -286,7 +360,7 @@ export async function resolveBasicAction(actor, item, roll, target) {
 async function resolveEarn(actor, roll) {
   if (!roll || !actor.isOwner) return;
   if (roll.isCritfail) {
-    ui.notifications.info("Earn failed critically. Resolve embarrassment and any dangerous-job wounds.");
+    ui.notifications.info(sbsI18n("swade-hud.UI.EarnfailedcriticallyResolveembarrassmentand_fefa2e81ed"));
     return;
   }
   if (roll.successes >= 1 && Number.isFinite(Number(actor.system.details?.currency))) {
@@ -295,6 +369,8 @@ async function resolveEarn(actor, roll) {
     const advances = Math.max(0, Number(actor.system.advances?.value) || 0);
     const tier = rank >= 0 ? rank + 1 : Math.min(5, Math.floor(advances / 4) + 1);
     const earnings = 100 * tier * (roll.successes >= 2 ? 2 : 1);
+    const money = game.modules?.get("swade-better-money")?.api;
+    if (await money?.receiveEarnings?.(actor, earnings)) return;
     await actor.update({"system.details.currency": Number(actor.system.details.currency) + earnings});
     ui.notifications.info(actor.name + " earned " + earnings + ".");
   } else if (roll.successes === 0 && actor.system.fatigue) {

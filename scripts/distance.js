@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 function bounds(token, grid) {
   const width = token.w ?? (token.document?.width ?? 1) * (grid.sizeX ?? grid.size ?? 0);
   const height = token.h ?? (token.document?.height ?? 1) * (grid.sizeY ?? grid.size ?? 0);
@@ -108,7 +109,7 @@ export class DistanceOverlay {
       this.container = new PIXI.Container(); this.container.eventMode = "none";
       this.line = this.container.addChild(new PIXI.Graphics());
       this.background = this.container.addChild(new PIXI.Graphics());
-      const style = { fontFamily: "Signika, sans-serif", fontSize: 14, fill: 0xf0eee6, fontWeight: "bold" };
+      const style = { fontFamily: sbsI18n("swade-hud.UI.Signikasansserif_b4bc72a8e6"), fontSize: 14, fill: 0xf0eee6, fontWeight: "bold" };
       this.label = this.container.addChild(Number(PIXI.VERSION?.split(".")[0]) >= 8 ? new PIXI.Text({ text: "", style }) : new PIXI.Text("", style));
       this.label.anchor.set(0.5); canvas.stage.addChild(this.container);
     }

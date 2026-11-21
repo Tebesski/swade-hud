@@ -1,3 +1,4 @@
+import {t as sbsI18n} from "./i18n.mjs";
 import { rollSkill } from "./swade.js";
 
 export const isGrapple = item => item?.type === "action" && item.system?.swid === "grapple";
@@ -31,13 +32,13 @@ export async function renderGrappleCard(message, html) {
   const row = document.createElement("div");
   row.className = "swade-hud-grapple";
   if (!actor || grab.isCritfail || grapple.resolved) {
-    row.textContent = grapple.resolved ?? (grab.isCritfail ? "Grab critically failed." : "Grab requires one targeted token.");
+    row.textContent = grapple.resolved ?? (grab.isCritfail ? sbsI18n("swade-hud.UI.Grabcriticallyfailed_8ee40d2ed1") : sbsI18n("swade-hud.UI.Grabrequiresonetargetedtoken_a3b5788e25"));
   } else {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "Resolve Grab · " + token.name;
     button.disabled = !actor.isOwner || !message.isOwner;
-    button.title = button.disabled ? "A GM or an owner of both the roll and defender can resolve Grab." : "Roll the defender’s Athletics";
+    button.title = button.disabled ? sbsI18n("swade-hud.UI.AGMoranownerof_594ab7d47a") : sbsI18n("swade-hud.UI.RollthedefendersAthletics_9ac8ffeeb3");
     button.addEventListener("click", async () => {
       if (button.disabled || resolving.has(message.id) || message.flags?.["swade-hud"]?.grapple?.resolved
         || !actor.isOwner || !message.isOwner) return;
@@ -45,12 +46,12 @@ export async function renderGrappleCard(message, html) {
       button.disabled = true;
       try {
         const skill = actor.items.find(item => item.type === "skill" && (item.system.swid === "athletics" || item.name === "Athletics"));
-        const resistance = await rollSkill(actor, skill?.id, {title: "Oppose Grapple", flavour: "Oppose Grapple"});
+        const resistance = await rollSkill(actor, skill?.id, {title: sbsI18n("swade-hud.UI.OpposeGrapple_8c1f3db7ae"), flavour: sbsI18n("swade-hud.UI.OpposeGrapple_8c1f3db7ae")});
         if (!Number.isFinite(resistance?.total)) return;
         const status = grappleOutcome(grab, resistance, actor.statuses);
         if (status) await actor.toggleActiveEffect(status, {active: true});
-        const result = status === "bound" ? "Target is Bound. The grappler is Vulnerable while maintaining the hold."
-          : status === "entangled" ? "Target is Entangled." : "Grab did not change the target’s status.";
+        const result = status === "bound" ? sbsI18n("swade-hud.UI.TargetisBoundThegrappleris_d973e9a704")
+          : status === "entangled" ? sbsI18n("swade-hud.UI.TargetisEntangled_cf040635ca") : sbsI18n("swade-hud.UI.Grabdidnotchangethetarget_4e834094db");
         await message.setFlag("swade-hud", "grapple", {...grapple, resolved: result});
         row.textContent = result;
       } catch (error) {
