@@ -11,7 +11,7 @@ import { EffectPanels, actorEffects, confirmEffectDeletion, nonSystemEffects, ef
 import { dispositionDetails, showDispositionDialog } from "./disposition.js";
 import { powerTemplates, placePowerTemplate, isTemplateRange, isBoostLowerTrait, powerPoolUsesNoPP, powerCostPresentation } from "./powers.js";
 import { showModifierDialog } from "./modifiers.js";
-import { actionKind, actionUsesSkill, basicActionLabel, COMMON_SKILL_ACTIONS, commonSkillActionLabel, coreSkillDocument, generateBasicActions, isOpposedAction, isUnskilledAttempt, rollCommonSkillAction, skillActions } from "./basic-actions.js";
+import { actionKind, actionUsesSkill, basicActionLabel, COMMON_SKILL_ACTIONS, commonSkillActionLabel, coreSkillDocument, generateBasicActions, isChaseAction, isResistanceOnlyAction, isOpposedAction, isUnskilledAttempt, rollCommonSkillAction, skillActions } from "./basic-actions.js";
 import { holdCombatant, naturalHealingCooldown, runExtra, EXTRAS } from "./extras.js";
 import { attackOptions, attackOptionState, setAttackOption } from "./attack-options.js";
 import { itemShortcutActions } from "./item-actions.js";
@@ -717,7 +717,9 @@ export class SwadeHUD {
     }
     if (!weapons.length) list.append(node("p", "empty", sbsI18n("swade-hud.UI.Noweapons_0097db6895")));
     this.actionItems(list, itemsOf(this.actor, "action", "ability")
-      .filter(item => !item.system.hidden && !actionUsesSkill(item)), "Actions & Abilities");
+      .filter(item => !item.system.hidden && !isChaseAction(item) && !isResistanceOnlyAction(item) && !actionUsesSkill(item))
+      .filter(item => ![actionKind(item), item.system.swid, item.name]
+        .some(value => /^(natural[ -]healing|wild[ -]attack)$/i.test(value ?? ""))), "Actions & Abilities");
   }
   actionItems(list, items, title) {
     if (!items.length) return;

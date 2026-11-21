@@ -4,9 +4,8 @@ import { rollSupport, traitActionReceiver } from "./support.js";
 
 const SETTING_MODULE = "swade-better-setting";
 const CORE = "swade-core-rules";
-const CORE_ACTIONS = new Set(["disarm", "grapple", "jump", "push", "treat-wounds", "suppressive-fire",
+const CORE_ACTIONS = new Set(["grapple", "jump", "push", "treat-wounds", "suppressive-fire",
   "network-the-nice-way", "network-the-not-so-nice-way"]);
-const CHASE_SKILLS = new Set(["athletics", "boating", "driving", "piloting", "riding"]);
 export const COMMON_SKILL_ACTIONS = {get support() { return sbsI18n("swade-hud.UI.Support_be91940b79"); }, get test() { return sbsI18n("swade-hud.UI.Test_532eaabd95"); }, get earn() { return sbsI18n("swade-hud.UI.Earn_a697f90fb1"); }};
 export function hustleProvider() {
   const money = game.modules?.get("swade-better-money")?.api;
@@ -42,6 +41,17 @@ export function isOpposedAction(action) {
   return action?.type === "resist" || /^(oppose\b|resist\b|avoid prone\b)/i.test(action?.name?.trim() ?? "");
 }
 
+export function isChaseAction(item) {
+  const kind = actionKind(item);
+  return kind === "chase" || kind?.startsWith("chase-");
+}
+
+export function isResistanceOnlyAction(item) {
+  const actions = item.system.actions;
+  const additional = Object.values(actions?.additional ?? {});
+  return !actions?.trait?.trim() && additional.length > 0 && additional.every(isOpposedAction);
+}
+
 export function actionUsesSkill(item) {
   const actions = item.system.actions;
   const traits = [actions?.trait, ...Object.values(actions?.additional ?? {})
@@ -53,7 +63,7 @@ export function actionUsesSkill(item) {
 export function skillActions(actor, skill) {
   const matches = [];
   for (const item of itemsOf(actor, "action", "ability")) {
-    if (item.system.hidden) continue;
+    if (item.system.hidden || isChaseAction(item)) continue;
     const actions = item.system.actions;
     if (skillMatches(skill, actions?.trait)) matches.push({ item, action: "formula", label: item.name });
     for (const [key, entry] of Object.entries(actions?.additional ?? {})) {
@@ -110,14 +120,12 @@ async function addBasicActions(actor) {
     setting?.libraryActions?.() ?? game.packs?.get("world.better-setting-actions")?.getDocuments() ?? [],
   ]);
   const skills = itemsOf(actor, "skill").filter(skill => !isUnskilledAttempt(skill));
-  const chaseSkills = skills.filter(skill => CHASE_SKILLS.has(normalized(skill.system.swid || skill.name)));
   const candidates = core.filter(item => item.type === "action" && CORE_ACTIONS.has(normalized(item.name))).map(item => copyAction(item));
   for (const item of supplement.filter(item => item.type === "action")) {
     const kind = item.flags?.[SETTING_MODULE]?.actionKind ?? normalized(item.name);
+    if (kind === "chase" || kind.startsWith("chase-") || isResistanceOnlyAction(item)) continue;
     if (kind === "each-skill" || PER_SKILL.has(kind)) {
       for (const skill of skills) candidates.push(copyAction(item, { skill, kind: normalized(item.name), suffix: true }));
-    } else if (kind === "chase" && chaseSkills.length) {
-      for (const skill of chaseSkills) candidates.push(copyAction(item, { skill, kind, suffix: chaseSkills.length > 1 }));
     } else candidates.push(copyAction(item, { kind }));
   }
   const existing = itemsOf(actor, "action");
