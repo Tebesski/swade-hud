@@ -50,12 +50,12 @@ export function powerTemplates(item) {
     }
   });
 }
-export function placePowerTemplate(preset, item, castContext) {
+export function placePowerTemplate(preset, item, castContext, chatMessageId) {
   const api = betterTemplates();
   const ring = api?.getRingTemplates?.(item)?.find(template => template.preset === preset);
   const shape = TEMPLATES.find(template => template.preset === preset);
-  const configured = castContext && (api?.readCastAutomation?.(item) ?? api?.readAutomation?.(item))?.shapes?.includes(shape?.key);
-  if (ring || configured) return api.placeTemplate(item, ring?.key ?? shape.key, { castContext });
+  const configured = (castContext || chatMessageId) && (api?.readCastAutomation?.(item) ?? api?.readAutomation?.(item))?.shapes?.includes(shape?.key);
+  if (ring || configured) return api.placeTemplate(item, ring?.key ?? shape.key, { castContext, chatMessageId });
   return game.swade.util.createRegionFromPreset(preset, item);
 }
 export const isTemplateRange = (range) => /\b(smt|sbt|mbt|lbt|cone|stream|ring)\b|blast template|burst template/i.test(String(range));

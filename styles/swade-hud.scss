@@ -207,6 +207,24 @@
     .action-star { flex: none; }
   }
   &[data-type="actions"] .item-list > :is(header, .hud-attack-options, [data-action="generate-actions"]) { column-span: all; }
+  &[data-type="actions"] {
+    --min-width: 10em;
+    --max-column-width: 12em;
+    --action-image-height: 1.6em;
+    .item.attack .weapon-heading { padding: 0.1em 0.2em; }
+    .item.attack .variants {
+      min-width: 0;
+      width: auto;
+      max-width: 100%;
+    }
+    .item.attack .variant { max-width: 100%; white-space: normal; height: auto; min-height: 1.584em; }
+    .item.attack .ranged-action { margin-left: 0; flex-wrap: nowrap; }
+    .item.attack .ranged-action .category { flex: 0 0 var(--category-width); }
+    .item.attack .ranged-action .variant { flex: 0 1 auto; min-width: 0; }
+    .hud-attack-options label { min-width: 0; white-space: normal; }
+    .hud-attack-options { margin-bottom: 0.15em; gap: 0.15em 0.55em; }
+    [data-action="generate-actions"] { padding: 0.2em; }
+  }
   &[data-type="items"] .item-list > header { break-after: avoid-column; }
   &[data-type="items"] .item .name { white-space: normal; overflow-wrap: anywhere; }
   .power-pool { display: inline-flex; align-items: center; gap: 0.15em; }

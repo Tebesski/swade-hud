@@ -966,6 +966,24 @@ document.querySelector("#checks").onclick = async (event) => {
     hud.render();
     hud.element.querySelector('[data-sidebar=items]').click();
     await tick();
+    const equipControl = id => hud.sidebar.querySelector('[data-action="equip"][data-item-id="' + id + '"]');
+    equipControl("sword").click();
+    await tick();
+    const equipmentEntries = () => [...document.querySelectorAll("#context-menu.swade-hud-equipment-context .context-item")];
+    assert("Weapon equipment menu includes all six modes", equipmentEntries().length === 6);
+    equipmentEntries().at(-1).click();
+    await tick();
+    assert("Choosing Two Hands uses native equipment state and updates the button icon and tooltip",
+      actor.items.get("sword").system.equipStatus === 5
+      && equipControl("sword").querySelector(".fa-sign-language")
+      && equipControl("sword").title === "TwoHands");
+    equipControl("armor").click();
+    await tick();
+    assert("Armor equipment menu offers Stored Carried and Equipped", equipmentEntries().length === 3);
+    equipmentEntries()[0].click();
+    await tick();
+    assert("Stored mode updates its icon and tooltip", actor.items.get("armor").system.equipStatus === 0
+      && equipControl("armor").querySelector(".fa-archive") && equipControl("armor").title === "Stored");
     hud.sidebar.querySelector('[data-action=edit-item]').click();
     await tick();
     assert("Item editing preserves the panel", hud.activeSidebar==="items" && hud.sidebar.isConnected);

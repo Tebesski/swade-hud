@@ -208,7 +208,7 @@ export async function rollCommonSkillAction(actor, skill, kind, targetingResolve
 
 async function resolveTest(skill, roll, target) {
   if (!roll) return;
-  if (roll.isCritfail || !(roll.total >= 4)) return;
+  if (roll.isCritfail || !Number.isFinite(roll.total)) return;
   const attribute = ATTRIBUTES.find(([key]) => key === skill?.system.attribute);
   if (!attribute) return ui.notifications.info(sbsI18n("swade-hud.UI.ResolvetheTestwiththeappropriate_b91daf382d"));
   const [key, label] = attribute;
@@ -249,7 +249,7 @@ async function resolveTestRequest(message, user) {
   const key = skill?.type === "skill" ? skill.system.attribute : null;
   if (!source?.testUserPermission(user, "OWNER") || !ATTRIBUTES.some(([id]) => id === key)
     || !["distracted", "vulnerable"].includes(request?.choice)
-    || roll?.rollType !== "trait" || roll.isCritfail || !(roll.total >= 4)) {
+    || roll?.rollType !== "trait" || roll.isCritfail || !Number.isFinite(roll.total)) {
     throw new Error(sbsI18n("swade-hud.UI.ResolvingaTestrequiresavalid_2845c8af3d"));
   }
   const operation = resistTest(message, request, key, roll.total);

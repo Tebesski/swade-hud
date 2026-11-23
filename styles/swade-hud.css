@@ -2648,6 +2648,47 @@ aside.swade-hud-effect-info .description .addendum p {
 #swade-hud-sidebar[data-type=actions] .item-list > :is(header, .hud-attack-options, [data-action=generate-actions]) {
   column-span: all;
 }
+#swade-hud-sidebar[data-type=actions] {
+  --min-width: 10em;
+  --max-column-width: 12em;
+  --action-image-height: 1.6em;
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .weapon-heading {
+  padding: 0.1em 0.2em;
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .variants {
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .variant {
+  max-width: 100%;
+  white-space: normal;
+  height: auto;
+  min-height: 1.584em;
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .ranged-action {
+  margin-left: 0;
+  flex-wrap: nowrap;
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .ranged-action .category {
+  flex: 0 0 var(--category-width);
+}
+#swade-hud-sidebar[data-type=actions] .item.attack .ranged-action .variant {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+#swade-hud-sidebar[data-type=actions] .hud-attack-options label {
+  min-width: 0;
+  white-space: normal;
+}
+#swade-hud-sidebar[data-type=actions] .hud-attack-options {
+  margin-bottom: 0.15em;
+  gap: 0.15em 0.55em;
+}
+#swade-hud-sidebar[data-type=actions] [data-action=generate-actions] {
+  padding: 0.2em;
+}
 #swade-hud-sidebar[data-type=items] .item-list > header {
   break-after: avoid-column;
 }

@@ -178,7 +178,7 @@ export async function renderPowerCastCard(message, html, useItem) {
       try {
         const action = button.dataset.action;
         if (action === "template") {
-          await placePowerTemplate(button.dataset.template, item, castContext);
+          await placePowerTemplate(button.dataset.template, item, castContext, message.id);
         } else {
           let actor = item.actor;
           if (item.system.actions?.additional?.[action]?.type === "resist") {

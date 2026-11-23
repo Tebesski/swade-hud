@@ -103,6 +103,31 @@ it("cancels a Test before sending a resistance request", async () => {
   assert.equal(defender.statuses.size, 0);
 });
 
+for (const total of [3, 0, -2]) {
+  it("resolves an opposed Test with an initiating total of " + total, async () => {
+    source.rollSkill = async () => {
+      const roll = trait(total, "lowTest", 0);
+      message("lowTest", player, roll);
+      return roll;
+    };
+    defender.rollAttribute = async () => {
+      const roll = trait(total - 1, "lowResistance", 0);
+      message("lowResistance", gm, roll);
+      return roll;
+    };
+    let prompted = false;
+    foundry.applications.api.DialogV2.wait = async () => {
+      prompted = true;
+      assert.equal(game.user, player);
+      return "distracted";
+    };
+    await rollCommonSkillAction(source, skill, "test");
+    assert.ok(prompted);
+    assert.ok(defender.statuses.has("distracted"));
+    assert.equal(messages.get("lowTest").getFlag("", "testResolved"), true);
+  });
+}
+
 it("lets a player choose an ally and trait before rolling Support, then applies the effect as GM", async () => {
   player.targets.clear();
   const titles = [];
