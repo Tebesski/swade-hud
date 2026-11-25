@@ -103,6 +103,24 @@ export async function renderItemSummary(actor, item, { includeActions = true } =
   const description = node("div", "description");
   description.innerHTML = await enrich(system.description);
   summary.append(description);
+  if (item.type === "power") {
+    const legacy = [...description.querySelectorAll(".sbs-power-modifier-summary")];
+    const powers = game.modules?.get("swade-better-powers")?.api;
+    const modifiers = node("div", "power-modifier-description");
+    if (powers?.powerChatDescription) {
+      modifiers.innerHTML = (await powers.powerChatDescription(item)).modifiers ?? "";
+    }
+    if (!modifiers.textContent.trim()) {
+      for (const entry of legacy) modifiers.append(entry.cloneNode(true));
+    }
+    legacy.forEach(entry => entry.remove());
+    if (modifiers.textContent.trim()) {
+      modifiers.querySelectorAll(".sbs-power-modifier-summary > h3, .sbs-power-modifier-summary > hr").forEach(entry => entry.remove());
+      const accordion = node("details", "swade-hud-power-modifiers");
+      accordion.append(node("summary", "", localize("SWADE.Mods", "Modifiers")), modifiers);
+      summary.append(accordion);
+    }
+  }
   if (system.notes && system.notes !== system.description) {
     summary.append(node("h3", "", sbsI18n("swade-hud.UI.Notes_8a7525b149")));
     const notes = node("div", "item-notes");

@@ -342,6 +342,13 @@
   .item-vital-stats { display: grid; grid-template-columns: minmax(7em, auto) minmax(0, 1fr); gap: 0.2em 0.8em; margin: 0 0 0.8em; }
   .item-vital-stats dt { font-weight: 600; }
   .item-vital-stats dd { margin: 0; overflow-wrap: anywhere; }
+  .swade-hud-power-modifiers {
+    margin-block: 0.6em;
+    border-top: 1px solid var(--color-border-light-primary, #777);
+    padding-top: 0.4em;
+    > summary { cursor: pointer; font-weight: 600; }
+    ul { margin-block: 0.4em; }
+  }
   .item-summary h3, .item-summary h4 { font: 600 1em "Signika",sans-serif; margin: 0.7em 0 0.25em; }
   .item-effect-summary { padding: 0.3em 0.5em; margin-block: 0.4em; border: 1px solid #ffffff24; }
   .effect-state { color: #c5b49b; font-size: 0.9em; margin: 0.2em 0; }

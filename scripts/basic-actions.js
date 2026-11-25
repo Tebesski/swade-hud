@@ -115,13 +115,14 @@ export function generateBasicActions(actor) {
 async function addBasicActions(actor) {
   const corePack = game.packs?.get(CORE + ".swade-actions");
   const setting = game.modules.get(SETTING_MODULE)?.api;
-  const [core, supplement] = await Promise.all([
+  const [core, supplement, mounts] = await Promise.all([
     corePack?.visible !== false ? corePack?.getDocuments() ?? [] : [],
     setting?.libraryActions?.() ?? game.packs?.get("world.better-setting-actions")?.getDocuments() ?? [],
+    game.modules.get("swade-better-mounts-and-vehicles")?.api?.libraryActions?.() ?? [],
   ]);
   const skills = itemsOf(actor, "skill").filter(skill => !isUnskilledAttempt(skill));
   const candidates = core.filter(item => item.type === "action" && CORE_ACTIONS.has(normalized(item.name))).map(item => copyAction(item));
-  for (const item of supplement.filter(item => item.type === "action")) {
+  for (const item of [...supplement, ...mounts].filter(item => item.type === "action")) {
     const kind = item.flags?.[SETTING_MODULE]?.actionKind ?? normalized(item.name);
     if (kind === "chase" || kind.startsWith("chase-") || isResistanceOnlyAction(item)) continue;
     if (kind === "each-skill" || PER_SKILL.has(kind)) {

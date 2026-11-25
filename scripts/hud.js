@@ -1226,7 +1226,8 @@ export class SwadeHUD {
    }
    actionSidebar(list) {
       const toggles = node("div", "hud-attack-options")
-      for (const option of attackOptions(this.actor)) {
+      for (const option of attackOptions(this.actor).filter(option =>
+         !["wild", "nonlethal", "flatBlade", "desperate2", "desperate4"].includes(option.id))) {
          const label = node("label")
          const field = node("input")
          field.type = "checkbox"
@@ -1239,7 +1240,7 @@ export class SwadeHUD {
          label.append(field, node("span", "", option.label))
          toggles.append(label)
       }
-      list.append(toggles)
+      if (toggles.childElementCount) list.append(toggles)
       if (this.owned)
          link(
             list,

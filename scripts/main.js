@@ -15,6 +15,7 @@ import { adjustChaseAttackModifiers, registerTestQuery, renderTestRaiseNote } fr
 import { registerMountedStatus } from "./effects.js";
 import { consumeSupport, installToolsSupport, markSupportRoll, registerSupportQuery } from "./support.js";
 import { renderGrappleCard } from "./grapple-chat.js";
+import { installToolsRunning } from "./running.js";
 
 const hud = new SwadeHUD();
 let advancedTargeting = false;
@@ -65,6 +66,7 @@ Hooks.once("ready", async () => {
   await migrateSettings().catch((error) => hud.report(error));
   installToolsDialogOverride().catch((error) => hud.report(error));
   installToolsSupport().catch((error) => hud.report(error));
+  installToolsRunning().catch((error) => hud.report(error));
   hud.render();
 });
 Hooks.on("updateSetting", setting => {

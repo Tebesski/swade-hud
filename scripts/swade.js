@@ -8,6 +8,7 @@ import { actionKind, actionTarget, basicActionEdges, hustleProvider, resolveBasi
 import { mountedSkill, rollMountedAttack, weaponModifiers, weaponOptionsForRoll, weaponRollKind, withWeaponRoll } from "./attack-options.js";
 import { rollSupport } from "./support.js";
 import { isGrapple } from "./grapple-chat.js";
+import { applyRunningPenalty } from "./running.js";
 export const MODULE_ID = "swade-hud";
 export const SWADE_TOOLS_SETTING = "disableSwadeToolsDialogs";
 export const SWADE_TOOLS_GLOBAL_SETTING = "disableSwadeToolsDialogsGlobally";
@@ -103,7 +104,9 @@ export async function rollRunning(actor) {
   if (!actor?.isOwner) return;
   const tools = swadeTools();
   if (typeof tools?.run === "function" && swadeToolsEnabled()) return tools.run(actor);
-  return actor.rollRunningDie?.();
+  const roll = await actor.rollRunningDie?.();
+  if (Number.isFinite(roll?.total)) await applyRunningPenalty(actor);
+  return roll;
 }
 
 const shakenRecoveries = new WeakMap();
@@ -133,6 +136,8 @@ export async function useItem(actor, item, action = "formula", event, {
   castCard = false, nativeOnly = false, additionalMods = [], inheritedWeaponOptions, targetingResolved = false,
 } = {}) {
   if (!actor?.isOwner || !item) return;
+  const mounts = game.modules.get("swade-better-mounts-and-vehicles")?.api;
+  if (action === "formula" && mounts?.handlesAction?.(item)) return mounts.useAction(actor, item);
   const additionalAction = item.system.actions?.additional?.[action];
   const targeting = game.modules.get("swade-better-setting")?.api?.withAdvancedTargeting;
   if (!targetingResolved && targeting) {

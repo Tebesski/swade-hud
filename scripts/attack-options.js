@@ -19,7 +19,8 @@ const options = [
 const styles = ["wild", "desperate2", "desperate4"];
 
 export function attackOptions(actor) {
-  const available = options.filter(option => (!option.mounted || hasStatus(actor, "mounted"))
+  const available = options.filter(option => (!option.mounted || hasStatus(actor, "mounted")
+    || game.modules.get("swade-better-mounts-and-vehicles")?.api?.rideOf?.(game.modules.get("swade-better-mounts-and-vehicles").api.sourceToken(actor))?.mode === "ride")
     && (!option.edges || findEdge(actor, ...option.edges)));
   if (attackOptionState(actor, "nonlethal")) {
     available.push({id: "flatBlade", label: sbsI18n("swade-hud.UI.Flatofblade_301dfec79f"), help: sbsI18n("swade-hud.UI.Apply1toFightingwhenusing_08f3b56213")});

@@ -2916,6 +2916,18 @@ aside.swade-hud-effect-info .description .addendum p {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.application.swade-hud-popup .swade-hud-power-modifiers {
+  margin-block: 0.6em;
+  border-top: 1px solid var(--color-border-light-primary, #777);
+  padding-top: 0.4em;
+}
+.application.swade-hud-popup .swade-hud-power-modifiers > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.application.swade-hud-popup .swade-hud-power-modifiers ul {
+  margin-block: 0.4em;
+}
 .application.swade-hud-popup .item-summary h3, .application.swade-hud-popup .item-summary h4 {
   font: 600 1em "Signika", sans-serif;
   margin: 0.7em 0 0.25em;

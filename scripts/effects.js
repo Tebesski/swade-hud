@@ -44,6 +44,9 @@ export function actorEffects(actor) {
 export function activeEffects(actor) {
   const neverShowIcon = globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON?.NEVER ?? 0;
   return actorEffects(actor).filter((effect) => (effect.showIcon !== neverShowIcon || effect.flags?.["swade-hud"]?.showInEffectPanels === true)
+    && (!effect.flags?.["swade-better-mounts-and-vehicles"]?.binding ||
+      game.modules.get("swade-better-mounts-and-vehicles")?.api?.sourceToken?.(actor)?.uuid === effect.flags["swade-better-mounts-and-vehicles"].binding.rider)
+    && !effect.statuses?.has("incapacitated") && !effect.statuses?.has(CONFIG.specialStatusEffects.DEFEATED)
     && effect.active !== false && !effect.disabled && !effect.isSuppressed);
 }
 
